@@ -42,7 +42,7 @@ async function bootstrap() {
   app.enableCors(corsOptions);
 
   const config = new DocumentBuilder()
-    .setTitle('Todogram actions API')
+    .setTitle('Todogram API')
     .setDescription('The todogram API')
     .setVersion('1.0')
     .addBearerAuth()

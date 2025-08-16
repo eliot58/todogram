@@ -49,7 +49,7 @@ export class AuthService {
             }
         });
 
-        const code = Math.floor(1000 + Math.random() * 9000).toString();
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
 
         await this.redisService.setKey(`otp:${email}`, code.toString(), 600)
 
