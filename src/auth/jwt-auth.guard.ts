@@ -1,12 +1,10 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { RequestWithAuth } from './auth.types';
-import { Logger } from 'nestjs-pino';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
     constructor(
-        private readonly logger: Logger,
         private readonly jwtService: JwtService
     ) {}
 
@@ -21,7 +19,7 @@ export class JwtAuthGuard implements CanActivate {
 
             if (payload.type !== "access") throw new UnauthorizedException('Invalid token type');
             
-            request.id = payload.sub;
+            request.userId = payload.sub;
         } catch (err) {
             throw new UnauthorizedException('Invalid or expired token');
         }

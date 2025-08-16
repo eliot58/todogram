@@ -15,6 +15,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { RedisModule } from './redis/redis.module';
 import { LikesModule } from './likes/likes.module';
+import { S3Module } from './s3/s3.module';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { LikesModule } from './likes/likes.module';
     ConfigModule.forRoot({
       isGlobal: true
     }),
-    LoggerModule.forRoot(),
+    // LoggerModule.forRoot(),
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -52,6 +53,7 @@ import { LikesModule } from './likes/likes.module';
     PrismaModule,
     RedisModule,
     LikesModule,
+    S3Module,
   ],
   controllers: [AppController],
   providers: [

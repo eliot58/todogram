@@ -3,6 +3,7 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { FastifyCorsOptions } from '@fastify/cors';
+import fastifyMultipart from '@fastify/multipart';
 import { ValidationPipe } from '@nestjs/common';
 import "./instrument";
 
@@ -11,8 +12,15 @@ async function bootstrap() {
     AppModule,
     new FastifyAdapter({
       ignoreTrailingSlash: true,
+      bodyLimit: 200 * 1024 * 1024,
     }),
   );
+
+  await app.register(fastifyMultipart, {
+    limits: {
+      fileSize: 200 * 1024 * 1024,
+    },
+  });
 
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
