@@ -18,6 +18,7 @@ model User {
   id             Int       @id @default(autoincrement())
   username       String    @unique
   fullName       String
+  phone          String
   email          String    @unique
   passwordHash   String
   bio            String?
@@ -27,13 +28,14 @@ model User {
   createdAt      DateTime  @default(now())
 
   posts          Post[]
-  reels          Reel[]
   stories        Story[]
   followers      Follower[] @relation("UserFollowers")
   following      Follower[] @relation("UserFollowing")
   likes          Like[]
   comments       Comment[]
   storyViews     StoryView[]
+  savedPosts     SavedPost[]
+  commentLikes   CommentLike[]
 }
 
 model Follower {
@@ -50,29 +52,48 @@ model Follower {
 }
 
 model Post {
-  id          Int       @id @default(autoincrement())
+  id          Int         @id @default(autoincrement())
   caption     String?
-  imageUrl    String
-  createdAt   DateTime  @default(now())
+  isReels     Boolean     @default(false)
+  videoUrl    String?
+  createdAt   DateTime    @default(now())
 
-  user        User      @relation(fields: [userId], references: [id])
+  user        User        @relation(fields: [userId], references: [id])
   userId      Int
 
+  images      PostImage[]
   likes       Like[]
   comments    Comment[]
+  savedBy     SavedPost[]
+
+  @@index([isReels])
 }
 
-model Reel {
-  id          Int       @id @default(autoincrement())
-  videoUrl    String
-  caption     String?
-  createdAt   DateTime  @default(now())
+model SavedPost {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
-  user        User      @relation(fields: [userId], references: [id])
-  userId      Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
 
-  likes       Like[]
-  comments    Comment[]
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    Int
+
+  @@unique([userId, postId])
+  @@index([userId, createdAt])
+  @@index([postId])
+}
+
+model PostImage {
+  id        Int      @id @default(autoincrement())
+  url       String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    Int
+
+  @@unique([postId, position])
 }
 
 model Story {
@@ -110,9 +131,28 @@ model Comment {
   post        Post?    @relation(fields: [postId], references: [id])
   postId      Int?
 
-  reel        Reel?    @relation(fields: [reelId], references: [id])
-  reelId      Int?
+  parentId    Int?
+  parent      Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies     Comment[] @relation("CommentReplies")
+
+  likes       CommentLike[]
 }
+
+model CommentLike {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  commentId Int
+
+  @@unique([userId, commentId])
+  @@index([commentId])
+  @@index([userId, createdAt])
+}
+
 
 model Like {
   id        Int      @id @default(autoincrement())
@@ -124,9 +164,5 @@ model Like {
   post      Post?    @relation(fields: [postId], references: [id])
   postId    Int?
 
-  reel      Reel?    @relation(fields: [reelId], references: [id])
-  reelId    Int?
-
   @@unique([userId, postId])
-  @@unique([userId, reelId])
 }

@@ -8,13 +8,10 @@ import { LoggerModule } from 'nestjs-pino';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { PostsModule } from './posts/posts.module';
-import { ReelsModule } from './reels/reels.module';
 import { StoriesModule } from './stories/stories.module';
-import { CommentsModule } from './comments/comments.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { RedisModule } from './redis/redis.module';
-import { LikesModule } from './likes/likes.module';
 import { S3Module } from './s3/s3.module';
 
 @Module({
@@ -47,12 +44,9 @@ import { S3Module } from './s3/s3.module';
     AuthModule,
     UsersModule,
     PostsModule,
-    ReelsModule,
     StoriesModule,
-    CommentsModule,
     PrismaModule,
     RedisModule,
-    LikesModule,
     S3Module,
   ],
   controllers: [AppController],

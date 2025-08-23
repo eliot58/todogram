@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, MinLength, MaxLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MinLength, MaxLength, IsPhoneNumber, Length } from 'class-validator';
 
 export class SignupDto {
   @ApiProperty()
@@ -11,6 +11,10 @@ export class SignupDto {
   @ApiProperty()
   @IsEmail()
   email: string;
+
+  @ApiProperty()
+  @IsPhoneNumber('RU')
+  phone: string;
 
   @ApiProperty()
   @IsString()
@@ -37,8 +41,8 @@ export class VerifyDto {
 
 export class SigninDto {
   @ApiProperty()
-  @IsEmail()
-  email: string;
+  @IsString()
+  login: string;
 
   @ApiProperty()
   @IsString()
@@ -50,6 +54,23 @@ export class RefreshTokenDto {
   @IsString()
   @IsNotEmpty()
   refreshToken: string;
+}
+
+export class ForgotPasswordDto {
+  @IsEmail()
+  email: string;
+}
+
+export class RestorePasswordDto {
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  @Length(6, 6)
+  code: string;
+
+  @IsString()
+  newPassword: string;
 }
 
 export class TokenVerifyDto {

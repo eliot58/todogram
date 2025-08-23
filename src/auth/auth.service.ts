@@ -16,7 +16,7 @@ export class AuthService {
         private readonly redisService: RedisService,
         private readonly mailService: MailerService,
         private readonly configService: ConfigService,
-    ) {}
+    ) { }
 
     public async generateAccessToken(userId: number): Promise<string> {
         const payload: AccessPayload = { sub: userId, type: "access" };
@@ -32,7 +32,7 @@ export class AuthService {
         });
     }
 
-    public async signup(username: string, email: string, password: string, fullName: string) {
+    public async signup(username: string, email: string, password: string, fullName: string, phone: string) {
         const exists = await this.prisma.user.findFirst({
             where: { OR: [{ username }, { email }] }
         });
@@ -45,6 +45,7 @@ export class AuthService {
                 username,
                 fullName,
                 email,
+                phone,
                 passwordHash
             }
         });
@@ -99,13 +100,19 @@ export class AuthService {
         return { message: 'Account has been verified' };
     }
 
-    public async signin(email: string, password: string) {
-        const user = await this.prisma.user.findUnique({
-            where: { email }
+    public async signin(login: string, password: string) {
+        const user = await this.prisma.user.findFirst({
+            where: {
+                OR: [
+                    { email: login },
+                    { username: login },
+                    { phone: login }
+                ]
+            }
         });
 
         if (!user) {
-            throw new UnauthorizedException('Invalid email or password');
+            throw new UnauthorizedException('Invalid credentials');
         }
 
         if (!user.isVerify) {
@@ -146,6 +153,63 @@ export class AuthService {
         } catch (error) {
             throw new UnauthorizedException('Invalid refresh token');
         }
+    }
+
+    public async forgotPassword(email: string) {
+        const user = await this.prisma.user.findUnique({ where: { email }, select: { id: true } });
+
+        const cooldownKey = `fp:cooldown:${email}`;
+        const onCooldown = await this.redisService.getKey(cooldownKey);
+        if (onCooldown) {
+            return { message: 'If this email is registered, a reset code has been sent.' };
+        }
+
+        if (user) {
+            const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+            await this.redisService.setKey(`fp:${email}`, code, 600);
+            await this.redisService.setKey(cooldownKey, '1', 60);
+
+            const fromEmail = this.configService.get<string>('EMAIL_HOST_USER');
+            const html = `
+            <h2>Восстановление пароля</h2>
+            <p>Ваш код для сброса пароля: <strong>${code}</strong></p>
+            <p>Срок действия кода — 10 минут.</p>
+          `;
+
+            await this.mailService.sendMail({
+                from: fromEmail,
+                to: email,
+                subject: 'Код для восстановления пароля',
+                html,
+            });
+        }
+
+        return { message: 'If this email is registered, a reset code has been sent.' };
+    }
+
+    public async restorePassword(email: string, code: string, newPassword: string) {
+        const saved = await this.redisService.getKey(`fp:${email}`);
+        if (!saved || saved !== code) {
+            throw new BadRequestException('Invalid or expired code');
+        }
+
+        const user = await this.prisma.user.findUnique({ where: { email }, select: { id: true } });
+        if (!user) {
+            await this.redisService.deleteKey(`fp:${email}`);
+            throw new BadRequestException('Invalid or expired code');
+        }
+
+        const passwordHash = await bcrypt.hash(newPassword, 10);
+
+        await this.prisma.user.update({
+            where: { email },
+            data: { passwordHash },
+        });
+
+        await this.redisService.deleteKey(`fp:${email}`);
+
+        return { message: 'Password has been reset successfully' };
     }
 
     public async tokenVerify(token: string) {
