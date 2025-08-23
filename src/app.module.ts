@@ -28,6 +28,9 @@ import { S3Module } from './s3/s3.module';
         const user = config.get<string>('EMAIL_HOST_USER');
         const pass = config.get<string>('EMAIL_HOST_PASSWORD');
 
+        console.log(user)
+        console.log(pass)
+
         return {
           transport: {
             host: 'smtp.mail.ru',
