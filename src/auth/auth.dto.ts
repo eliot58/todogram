@@ -23,7 +23,7 @@ export class SignupDto {
 
   @ApiProperty()
   @IsString()
-  @MinLength(6)
+  @MinLength(8)
   password: string;
 }
 
@@ -34,8 +34,8 @@ export class VerifyDto {
 
   @ApiProperty()
   @IsString()
-  @MinLength(4)
-  @MaxLength(4)
+  @MinLength(6)
+  @MaxLength(6)
   code: string;
 }
 
@@ -58,22 +58,34 @@ export class RefreshTokenDto {
 
 export class ForgotPasswordDto {
   @IsEmail()
+  @ApiProperty()
   email: string;
 }
 
 export class RestorePasswordDto {
   @IsEmail()
+  @ApiProperty()
   email: string;
 
   @IsString()
   @Length(6, 6)
+  @ApiProperty()
   code: string;
 
   @IsString()
+  @ApiProperty()
   newPassword: string;
 }
 
+export class ResendVerifyDto {
+  @IsEmail()
+  @ApiProperty()
+  email: string;
+}
+
 export class TokenVerifyDto {
-    token: string;
+  @IsString()
+  @ApiProperty()
+  token: string;
 }
 

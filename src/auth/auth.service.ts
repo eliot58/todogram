@@ -36,10 +36,11 @@ export class AuthService {
         const exists = await this.prisma.user.findFirst({
             where: { OR: [{ username }, { email }] }
         });
+        
         if (exists) throw new BadRequestException('User already exists');
-
+    
         const passwordHash = await bcrypt.hash(password, 10);
-
+    
         await this.prisma.user.create({
             data: {
                 username,
@@ -49,26 +50,70 @@ export class AuthService {
                 passwordHash
             }
         });
-
+    
+        const cooldownKey = `otp:cooldown:${email}`;
+        const onCooldown = await this.redisService.getKey(cooldownKey);
+        if (onCooldown) {
+            return { message: 'OTP has already been sent. Please wait before requesting again.' };
+        }
+    
         const code = Math.floor(100000 + Math.random() * 900000).toString();
-
-        await this.redisService.setKey(`otp:${email}`, code.toString(), 600)
-
-        const message = `<h2>Ваш код подтверждения</h2>
-            <p>Введите этот код для входа: <strong>${code}</strong></p>
-            `
-
+    
+        await this.redisService.setKey(`otp:${email}`, code, 600);
+        await this.redisService.setKey(cooldownKey, '1', 60);
+    
         const fromEmail = this.configService.get<string>('EMAIL_HOST_USER');
-
+    
+        const message = `<h2>Ваш код подтверждения</h2>
+            <p>Введите этот код для подтверждения аккаунта: <strong>${code}</strong></p>
+            <p>Срок действия кода — 10 минут.</p>`;
+    
         await this.mailService.sendMail({
             from: fromEmail,
             to: email,
-            subject: `Ваш код подтверждения`,
+            subject: 'Код подтверждения аккаунта',
             html: message,
         });
-
+    
         return { message: 'OTP has been sent to your email' };
     }
+    
+
+    public async resendVerification(email: string) {
+        const cooldownKey = `otp:cooldown:${email}`;
+        const onCooldown = await this.redisService.getKey(cooldownKey);
+        if (onCooldown) {
+            return { message: 'If this email is registered, a verification code has been sent.' };
+        }
+
+        const user = await this.prisma.user.findUnique({
+            where: { email },
+            select: { id: true, isVerify: true }
+        });
+
+        if (user && !user.isVerify) {
+            const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+            await this.redisService.setKey(`otp:${email}`, code, 600);
+
+            await this.redisService.setKey(cooldownKey, '1', 60);
+
+            const fromEmail = this.configService.get<string>('EMAIL_HOST_USER');
+            const message = `<h2>Ваш код подтверждения</h2>
+                <p>Введите этот код для подтверждения аккаунта: <strong>${code}</strong></p>
+                <p>Срок действия кода — 10 минут.</p>`;
+
+            await this.mailService.sendMail({
+                from: fromEmail,
+                to: email,
+                subject: 'Код подтверждения аккаунта',
+                html: message,
+            });
+        }
+
+        return { message: 'If this email is registered, a verification code has been sent.' };
+    }
+
 
     public async verify(email: string, code: string) {
         const otp = await this.redisService.getKey(`otp:${email}`);

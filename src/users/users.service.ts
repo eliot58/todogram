@@ -1,10 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { UpdateProfileDto } from './user.dto';
+import { S3Service } from '../s3/s3.service';
 
 @Injectable()
 export class UsersService {
-    constructor(private readonly prisma: PrismaService) {}
+    constructor(private readonly prisma: PrismaService, private s3: S3Service) { }
 
     async getUserById(userId: number) {
         return this.prisma.user.findUnique({
@@ -22,24 +22,43 @@ export class UsersService {
         });
     }
 
-    async updateProfile(userId: number, dto: UpdateProfileDto) {
+    async updateProfile(
+        userId: number,
+        dto: any,
+        avatar?: { buffer: Buffer; filename: string; mimetype: string } | null
+    ) {
+        if ('avatar' in dto) {
+            delete dto.avatar;
+        }
+
         if (dto.username) {
             const exists = await this.prisma.user.findFirst({
-                where: { username: dto.username, NOT: { id: userId } }
+                where: { username: dto.username, NOT: { id: userId } },
             });
             if (exists) throw new BadRequestException('Username already taken');
         }
-    
+
         if (dto.email) {
             const exists = await this.prisma.user.findFirst({
-                where: { email: dto.email, NOT: { id: userId } }
+                where: { email: dto.email, NOT: { id: userId } },
             });
             if (exists) throw new BadRequestException('Email already taken');
         }
-    
+
+        let avatarUrl: string | undefined;
+        if (avatar) {
+            avatarUrl = await this.s3.uploadBuffer(
+                avatar.buffer,
+                avatar.mimetype,
+                `avatars`,
+                avatar.filename,
+            );
+
+        }
+
         const updatedUser = await this.prisma.user.update({
             where: { id: userId },
-            data: { ...dto },
+            data: { ...dto, ...(avatarUrl ? { avatarUrl } : {}) },
             select: {
                 id: true,
                 username: true,
@@ -48,12 +67,13 @@ export class UsersService {
                 avatarUrl: true,
                 email: true,
                 isVerify: true,
-                createdAt: true
-            }
+                createdAt: true,
+            },
         });
-    
+
         return { message: 'Profile updated successfully', user: updatedUser };
     }
+
 
     async getFollowers(userId: number, page: number, limit: number) {
         const skip = (page - 1) * limit;
@@ -117,41 +137,41 @@ export class UsersService {
         if (userId === targetId) {
             throw new BadRequestException("You cannot follow yourself");
         }
-    
+
         const exists = await this.prisma.follower.findUnique({
             where: {
                 followerId_followingId: { followerId: userId, followingId: targetId }
             }
         });
-    
+
         if (exists) {
             throw new BadRequestException("Already following this user");
         }
-    
+
         await this.prisma.follower.create({
             data: { followerId: userId, followingId: targetId }
         });
-    
+
         return { message: "Successfully followed the user" };
     }
-    
+
     async unfollow(userId: number, targetId: number) {
         const exists = await this.prisma.follower.findUnique({
             where: {
                 followerId_followingId: { followerId: userId, followingId: targetId }
             }
         });
-    
+
         if (!exists) {
             throw new BadRequestException("You are not following this user");
         }
-    
+
         await this.prisma.follower.delete({
             where: {
                 followerId_followingId: { followerId: userId, followingId: targetId }
             }
         });
-    
+
         return { message: "Successfully unfollowed the user" };
     }
 }
