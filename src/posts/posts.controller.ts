@@ -102,7 +102,7 @@ export class PostsController {
         @Query('page') page: number,
         @Query('limit') limit: number,
     ) {
-        return this.postsService.getComments(request.userId, id, page, limit);
+        return this.postsService.getComments(id, page, limit);
     }
 
     @Post(':id/comments')
@@ -122,9 +122,9 @@ export class PostsController {
     async addComment(
         @Req() request: RequestWithAuth,
         @Param('id') id: number,
-        @Body() body: { content: string; parentId?: number },
+        @Body() body: { content: string; },
     ) {
-        return this.postsService.addComment(request.userId, id, body.content, body.parentId);
+        return this.postsService.addComment(request.userId, id, body.content);
     }
 
     // ---------- LIKES ----------

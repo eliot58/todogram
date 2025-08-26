@@ -143,24 +143,24 @@ export class PostsService {
         return { items, hasMore, page: safePage, limit: safeLimit };
     }
 
-    async addComment(userId: number, postId: number, content: string, parentId?: number) {
+    async addComment(userId: number, postId: number, content: string) {
         const text = (content ?? '').trim();
         if (!text) throw new BadRequestException('Content is required');
         if (text.length > 1000) throw new BadRequestException('Content is too long (max 1000)');
 
-        const post = await this.prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
+        const post = await this.prisma.post.findUnique({
+            where: { id: postId },
+            select: { id: true },
+        });
         if (!post) throw new NotFoundException('Post not found');
 
-        if (parentId) {
-            const parent = await this.prisma.comment.findUnique({
-                where: { id: parentId },
-                select: { id: true, postId: true },
-            });
-            if (!parent || parent.postId !== postId) throw new BadRequestException('Invalid parentId');
-        }
-
         const comment = await this.prisma.comment.create({
-            data: { content: text, userId, postId, parentId: parentId ?? null },
+            data: {
+                content: text,
+                userId,
+                postId,
+                parentId: null
+            },
             include: {
                 user: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
                 _count: { select: { likes: true, replies: true } },
@@ -170,7 +170,7 @@ export class PostsService {
         return comment;
     }
 
-    async getComments(requesterId: number, postId: number, page: number, limit: number) {
+    async getComments(postId: number, page: number, limit: number) {
         const safePage = Math.max(page || 1, 1);
         const safeLimit = Math.min(Math.max(limit || 20, 1), 100);
         const skip = (safePage - 1) * safeLimit;
