@@ -1,8 +1,9 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequestWithAuth } from '../auth/auth.types';
 import { ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { isImage } from '../helper/mime';
 
 @Controller('users')
 @ApiBearerAuth()
@@ -43,6 +44,13 @@ export class UsersController {
                 const file = { buffer: Buffer.concat(chunks), filename: part.filename, mimetype: part.mimetype };
 
                 if (part.fieldname === 'avatar') {
+                    if (!isImage(file.mimetype)) {
+                        throw new BadRequestException('Avatar must be PNG or JPEG');
+                    }
+
+                    const MAX = 5 * 1024 * 1024;
+                    if (file.buffer.length > MAX) throw new BadRequestException('Avatar file is too large (max 5MB)');
+
                     avatar = file;
                 } else {
                     throw new BadRequestException(`Unexpected file field: ${part.fieldname}`);
@@ -59,8 +67,8 @@ export class UsersController {
     @UseGuards(JwtAuthGuard)
     async getFollowers(
         @Req() request: RequestWithAuth,
-        @Query('page') page: number = 1,
-        @Query('limit') limit: number = 10
+        @Query('page') page: number,
+        @Query('limit') limit: number
     ) {
         return this.usersService.getFollowers(request.userId, page, limit);
     }
@@ -69,8 +77,8 @@ export class UsersController {
     @UseGuards(JwtAuthGuard)
     async getFollowing(
         @Req() request: RequestWithAuth,
-        @Query('page') page: number = 1,
-        @Query('limit') limit: number = 10
+        @Query('page') page: number,
+        @Query('limit') limit: number
     ) {
         return this.usersService.getFollowing(request.userId, page, limit);
     }
@@ -85,5 +93,23 @@ export class UsersController {
     @UseGuards(JwtAuthGuard)
     async unfollow(@Req() request: RequestWithAuth, @Param('id') id: number) {
         return this.usersService.unfollow(request.userId, id);
+    }
+
+    @Get(':id/posts')
+    async getUserPosts(
+        @Param('id') id: number,
+        @Query('page') page: number,
+        @Query('limit') limit: number,
+    ) {
+        return this.usersService.getUserPosts(id, page, limit);
+    }
+
+    @Get(':id/reels')
+    async getUserReels(
+        @Param('id') id: number,
+        @Query('page') page: number,
+        @Query('limit') limit: number,
+    ) {
+        return this.usersService.getUserReels(id, page, limit);
     }
 }

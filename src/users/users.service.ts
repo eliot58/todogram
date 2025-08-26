@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
 
@@ -50,8 +50,7 @@ export class UsersService {
             avatarUrl = await this.s3.uploadBuffer(
                 avatar.buffer,
                 avatar.mimetype,
-                `avatars`,
-                avatar.filename,
+                `avatars`
             );
 
         }
@@ -173,5 +172,59 @@ export class UsersService {
         });
 
         return { message: "Successfully unfollowed the user" };
+    }
+
+    async getUserPosts(targetUserId: number, page: number, limit: number) {
+        const exists = await this.prisma.user.findUnique({
+            where: { id: targetUserId },
+            select: { id: true },
+        });
+        if (!exists) throw new NotFoundException('User not found');
+
+        const skip = (page - 1) * limit;
+        const takePlusOne = limit + 1;
+
+        const posts = await this.prisma.post.findMany({
+            where: { userId: targetUserId, isReels: false },
+            orderBy: [{ createdAt: 'desc' as const }, { id: 'desc' as const }],
+            skip,
+            take: takePlusOne,
+            include: {
+                user: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
+                images: { orderBy: { position: 'asc' }, select: { id: true, url: true, position: true } },
+                _count: { select: { likes: true, comments: true, savedBy: true } },
+            },
+        });
+
+        const hasMore = posts.length > limit;
+        const items = posts.slice(0, limit);
+        return { items, hasMore, page, limit };
+    }
+
+    async getUserReels(targetUserId: number, page: number, limit: number) {
+        const exists = await this.prisma.user.findUnique({
+            where: { id: targetUserId },
+            select: { id: true },
+        });
+        if (!exists) throw new NotFoundException('User not found');
+
+        const skip = (page - 1) * limit;
+        const takePlusOne = limit + 1;
+
+        const reels = await this.prisma.post.findMany({
+            where: { userId: targetUserId, isReels: true },
+            orderBy: [{ createdAt: 'desc' as const }, { id: 'desc' as const }],
+            skip,
+            take: takePlusOne,
+            include: {
+                user: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
+                images: { orderBy: { position: 'asc' }, select: { id: true, url: true, position: true } },
+                _count: { select: { likes: true, comments: true, savedBy: true } },
+            },
+        });
+
+        const hasMore = reels.length > limit;
+        const items = reels.slice(0, limit);
+        return { items, hasMore, page, limit };
     }
 }

@@ -21,8 +21,7 @@ export class S3Service {
     async uploadBuffer(
         fileBuffer: Buffer,
         mimeType: string,
-        folder: string,
-        filename: string
+        folder: string
     ): Promise<string> {
         const key = `${folder}/${uuid()}`;
 

@@ -67,6 +67,7 @@ model Post {
   savedBy     SavedPost[]
 
   @@index([isReels])
+  @@index([userId, createdAt])
 }
 
 model SavedPost {
@@ -107,6 +108,10 @@ model Story {
   userId      Int
 
   views       StoryView[]
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+  @@index([userId, createdAt])
 }
 
 model StoryView {

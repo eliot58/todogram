@@ -1,6 +1,7 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
+import { isImage, isVideo } from '../helper/mime';
 
 type ImageFile = { buffer: Buffer; filename: string; mimetype: string };
 type VideoFile = { buffer: Buffer; filename: string; mimetype: string };
@@ -9,13 +10,6 @@ type VideoFile = { buffer: Buffer; filename: string; mimetype: string };
 export class PostsService {
     constructor(private prisma: PrismaService, private s3: S3Service) { }
 
-    private isImage(mime: string) {
-        return /^image\/(jpe?g|png|webp|gif|avif)$/.test(mime);
-    }
-    private isVideo(mime: string) {
-        return /^video\/(mp4|quicktime|x-matroska|webm|ogg)$/.test(mime);
-    }
-
     private assertPayload(
         input: { isReels: boolean },
         files: { images: ImageFile[]; video: VideoFile | null }
@@ -23,12 +17,12 @@ export class PostsService {
         if (input.isReels) {
             if (!files.video) throw new BadRequestException('video is required for reels');
             if (files.images.length > 0) throw new BadRequestException('images are not allowed for reels');
-            if (!this.isVideo(files.video.mimetype)) throw new BadRequestException('Invalid video mime type');
+            if (!isVideo(files.video.mimetype)) throw new BadRequestException('Invalid video mime type');
         } else {
             if (files.images.length === 0) throw new BadRequestException('At least one image is required');
             if (files.video) throw new BadRequestException('video is not allowed for non-reels post');
             for (const img of files.images) {
-                if (!this.isImage(img.mimetype)) throw new BadRequestException(`Invalid image mime type: ${img.mimetype}`);
+                if (!isImage(img.mimetype)) throw new BadRequestException(`Invalid image mime type: ${img.mimetype}`);
             }
         }
     }
@@ -40,7 +34,7 @@ export class PostsService {
         this.assertPayload(data, files);
 
         if (data.isReels) {
-            const videoUrl = await this.s3.uploadBuffer(files.video!.buffer, files.video!.mimetype, 'posts/videos', files.video!.filename);
+            const videoUrl = await this.s3.uploadBuffer(files.video!.buffer, files.video!.mimetype, 'posts/videos');
 
             const post = await this.prisma.post.create({
                 data: {
@@ -60,7 +54,7 @@ export class PostsService {
         } else {
             const uploaded = await Promise.all(
                 files.images.map((img, idx) =>
-                    this.s3.uploadBuffer(img.buffer, img.mimetype, 'posts/images', img.filename).then((url) => ({
+                    this.s3.uploadBuffer(img.buffer, img.mimetype, 'posts/images').then((url) => ({
                         url,
                         position: idx,
                     }))
@@ -109,5 +103,152 @@ export class PostsService {
 
         await this.prisma.post.delete({ where: { id } });
         return { message: 'Deleted' };
+    }
+
+    async findFeed(userId: number, limit: number, page: number) {
+        const safeLimit = Math.min(Math.max(limit || 20, 1), 100);
+        const safePage = Math.max(page || 1, 1);
+
+        const following = await this.prisma.follower.findMany({
+            where: { followerId: userId },
+            select: { followingId: true },
+        });
+
+        const authorIds = following.map(f => f.followingId);
+
+        if (authorIds.length === 0) {
+            return { items: [], hasMore: false, page: safePage, limit: safeLimit };
+        }
+
+        const where = { userId: { in: authorIds } };
+        const orderBy = [{ createdAt: 'desc' as const }, { id: 'desc' as const }];
+        const skip = (safePage - 1) * safeLimit;
+        const takePlusOne = safeLimit + 1;
+
+        const posts = await this.prisma.post.findMany({
+            where,
+            orderBy,
+            skip,
+            take: takePlusOne,
+            include: {
+                user: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
+                images: { orderBy: { position: 'asc' }, select: { id: true, url: true, position: true } },
+                _count: { select: { likes: true, comments: true, savedBy: true } },
+            },
+        });
+
+        const hasMore = posts.length > safeLimit;
+        const items = posts.slice(0, safeLimit);
+
+        return { items, hasMore, page: safePage, limit: safeLimit };
+    }
+
+    async addComment(userId: number, postId: number, content: string, parentId?: number) {
+        const text = (content ?? '').trim();
+        if (!text) throw new BadRequestException('Content is required');
+        if (text.length > 1000) throw new BadRequestException('Content is too long (max 1000)');
+
+        const post = await this.prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
+        if (!post) throw new NotFoundException('Post not found');
+
+        if (parentId) {
+            const parent = await this.prisma.comment.findUnique({
+                where: { id: parentId },
+                select: { id: true, postId: true },
+            });
+            if (!parent || parent.postId !== postId) throw new BadRequestException('Invalid parentId');
+        }
+
+        const comment = await this.prisma.comment.create({
+            data: { content: text, userId, postId, parentId: parentId ?? null },
+            include: {
+                user: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
+                _count: { select: { likes: true, replies: true } },
+            },
+        });
+
+        return comment;
+    }
+
+    async getComments(requesterId: number, postId: number, page: number, limit: number) {
+        const safePage = Math.max(page || 1, 1);
+        const safeLimit = Math.min(Math.max(limit || 20, 1), 100);
+        const skip = (safePage - 1) * safeLimit;
+        const takePlusOne = safeLimit + 1;
+
+        const post = await this.prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
+        if (!post) throw new NotFoundException('Post not found');
+
+        // Топ-уровень (parentId = null). Если нужны все — убери фильтр parentId.
+        const rows = await this.prisma.comment.findMany({
+            where: { postId, parentId: null },
+            orderBy: [{ createdAt: 'desc' as const }, { id: 'desc' as const }],
+            skip,
+            take: takePlusOne,
+            include: {
+                user: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
+                _count: { select: { likes: true, replies: true } },
+            },
+        });
+
+        const hasMore = rows.length > safeLimit;
+        const items = rows.slice(0, safeLimit);
+
+        return { items, hasMore, page: safePage, limit: safeLimit };
+    }
+
+    // ===== LIKES =====
+    async likePost(userId: number, postId: number) {
+        const post = await this.prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
+        if (!post) throw new NotFoundException('Post not found');
+
+        // upsert по уникальному композитному ключу (userId, postId)
+        await this.prisma.like.upsert({
+            where: { userId_postId: { userId, postId } },
+            create: { userId, postId },
+            update: {},
+        });
+
+        const likesCount = await this.prisma.like.count({ where: { postId } });
+        return { liked: true, likesCount };
+    }
+
+    async unlikePost(userId: number, postId: number) {
+        const post = await this.prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
+        if (!post) throw new NotFoundException('Post not found');
+
+        await this.prisma.like
+            .delete({ where: { userId_postId: { userId, postId } } })
+            .catch(() => void 0);
+
+        const likesCount = await this.prisma.like.count({ where: { postId } });
+        return { liked: false, likesCount };
+    }
+
+    // ===== SAVES =====
+    async savePost(userId: number, postId: number) {
+        const post = await this.prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
+        if (!post) throw new NotFoundException('Post not found');
+
+        await this.prisma.savedPost.upsert({
+            where: { userId_postId: { userId, postId } },
+            create: { userId, postId },
+            update: {},
+        });
+
+        const savedCount = await this.prisma.savedPost.count({ where: { postId } });
+        return { saved: true, savedCount };
+    }
+
+    async unsavePost(userId: number, postId: number) {
+        const post = await this.prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
+        if (!post) throw new NotFoundException('Post not found');
+
+        await this.prisma.savedPost
+            .delete({ where: { userId_postId: { userId, postId } } })
+            .catch(() => void 0);
+
+        const savedCount = await this.prisma.savedPost.count({ where: { postId } });
+        return { saved: false, savedCount };
     }
 }

@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Param, Post, Req, UseGuards, BadRequestException } from '@nestjs/common';
+import { Controller, Delete, Get, Param, Post, Req, UseGuards, BadRequestException, Query, Body } from '@nestjs/common';
 import { PostsService } from './posts.service';
 import { RequestWithAuth } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -80,5 +80,80 @@ export class PostsController {
     @UseGuards(JwtAuthGuard)
     async remove(@Req() request: RequestWithAuth, @Param('id') id: number) {
         return this.postsService.delete(request.userId, id);
+    }
+
+    @Get('feed')
+    @ApiBearerAuth()
+    @UseGuards(JwtAuthGuard)
+    async feed(
+        @Req() request: RequestWithAuth,
+        @Query('page') page: number,
+        @Query('limit') limit: number
+    ) {
+        return this.postsService.findFeed(request.userId, limit, page);
+    }
+
+    @Get(':id/comments')
+    @ApiBearerAuth()
+    @UseGuards(JwtAuthGuard)
+    async listComments(
+        @Req() request: RequestWithAuth,
+        @Param('id') id: number,
+        @Query('page') page: number,
+        @Query('limit') limit: number,
+    ) {
+        return this.postsService.getComments(request.userId, id, page, limit);
+    }
+
+    @Post(':id/comments')
+    @ApiBearerAuth()
+    @UseGuards(JwtAuthGuard)
+    @ApiConsumes('application/json')
+    @ApiBody({
+        schema: {
+            type: 'object',
+            required: ['content'],
+            properties: {
+                content: { type: 'string', minLength: 1, maxLength: 1000 },
+                parentId: { type: 'number', nullable: true },
+            },
+        },
+    })
+    async addComment(
+        @Req() request: RequestWithAuth,
+        @Param('id') id: number,
+        @Body() body: { content: string; parentId?: number },
+    ) {
+        return this.postsService.addComment(request.userId, id, body.content, body.parentId);
+    }
+
+    // ---------- LIKES ----------
+    @Post(':id/like')
+    @ApiBearerAuth()
+    @UseGuards(JwtAuthGuard)
+    async like(@Req() request: RequestWithAuth, @Param('id') id: number) {
+        return this.postsService.likePost(request.userId, id);
+    }
+
+    @Delete(':id/like')
+    @ApiBearerAuth()
+    @UseGuards(JwtAuthGuard)
+    async unlike(@Req() request: RequestWithAuth, @Param('id') id: number) {
+        return this.postsService.unlikePost(request.userId, id);
+    }
+
+    // ---------- SAVES ----------
+    @Post(':id/save')
+    @ApiBearerAuth()
+    @UseGuards(JwtAuthGuard)
+    async save(@Req() request: RequestWithAuth, @Param('id') id: number) {
+        return this.postsService.savePost(request.userId, id);
+    }
+
+    @Delete(':id/save')
+    @ApiBearerAuth()
+    @UseGuards(JwtAuthGuard)
+    async unsave(@Req() request: RequestWithAuth, @Param('id') id: number) {
+        return this.postsService.unsavePost(request.userId, id);
     }
 }
