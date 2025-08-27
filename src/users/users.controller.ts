@@ -155,4 +155,17 @@ export class UsersController {
             limit,
         });
     }
+
+    @Get('search')
+    @ApiQuery({ name: 'q', required: true, type: String })
+    @ApiQuery({ name: 'cursor', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    async searchUsers(
+        @Req() request: RequestWithAuth,
+        @Query('q') q: string,
+        @Query('cursor') cursor?: number,
+        @Query('limit') limit: number = 20,
+    ) {
+        return this.usersService.searchUsers(request.userId, q, cursor, limit);
+    }
 }
