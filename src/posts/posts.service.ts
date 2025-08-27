@@ -81,17 +81,6 @@ export class PostsService {
         }
     }
 
-    async findAll() {
-        return this.prisma.post.findMany({
-            orderBy: { createdAt: 'desc' },
-            include: {
-                images: { orderBy: { position: 'asc' } },
-                user: { select: { id: true, username: true, avatarUrl: true, fullName: true } },
-                _count: { select: { likes: true, comments: true, savedBy: true } },
-            },
-        });
-    }
-
     async delete(userId: number, id: number) {
         const post = await this.prisma.post.findUnique({
             where: { id },
@@ -105,44 +94,138 @@ export class PostsService {
         return { message: 'Deleted' };
     }
 
-    async findFeed(userId: number, limit: number, page: number) {
-        const safeLimit = Math.min(Math.max(limit || 20, 1), 100);
-        const safePage = Math.max(page || 1, 1);
-
-        const following = await this.prisma.follower.findMany({
-            where: { followerId: userId },
-            select: { followingId: true },
-        });
-
-        const authorIds = following.map(f => f.followingId);
-
-        if (authorIds.length === 0) {
-            return { items: [], hasMore: false, page: safePage, limit: safeLimit };
-        }
-
-        const where = { userId: { in: authorIds } };
-        const orderBy = [{ createdAt: 'desc' as const }, { id: 'desc' as const }];
-        const skip = (safePage - 1) * safeLimit;
-        const takePlusOne = safeLimit + 1;
+    async getAllPosts(
+        viewerId: number,
+        { cursor, limit },
+    ) {
+        const take = Math.min(Math.max(limit || 20, 1), 100);
 
         const posts = await this.prisma.post.findMany({
-            where,
-            orderBy,
-            skip,
-            take: takePlusOne,
+            orderBy: { id: 'desc' },
+            cursor: cursor ? { id: Number(cursor) } : undefined,
+            skip: cursor ? 1 : 0,
+            take,
             include: {
+                images: { orderBy: { position: 'asc' } },
                 user: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
-                images: { orderBy: { position: 'asc' }, select: { id: true, url: true, position: true } },
                 _count: { select: { likes: true, comments: true, savedBy: true } },
             },
         });
 
-        const hasMore = posts.length > safeLimit;
-        const items = posts.slice(0, safeLimit);
+        const ids = posts.map(p => p.id);
 
-        return { items, hasMore, page: safePage, limit: safeLimit };
+        let likedSet = new Set<number>();
+        let savedSet = new Set<number>();
+
+        if (ids.length > 0) {
+            const [likes, saved] = await Promise.all([
+                this.prisma.like.findMany({
+                    where: { userId: viewerId, postId: { in: ids } },
+                    select: { postId: true },
+                }),
+                this.prisma.savedPost.findMany({
+                    where: { userId: viewerId, postId: { in: ids } },
+                    select: { postId: true },
+                }),
+            ]);
+
+            const likeIds = likes.map(l => l.postId).filter((id): id is number => typeof id === 'number');
+            const savedIds = saved.map(s => s.postId).filter((id): id is number => typeof id === 'number');
+
+            likedSet = new Set(likeIds);
+            savedSet = new Set(savedIds);
+        }
+
+        const items = posts.map(p => ({
+            id: p.id,
+            caption: p.caption,
+            isReels: p.isReels,
+            videoUrl: p.videoUrl,
+            createdAt: p.createdAt,
+            user: p.user,
+            images: p.images,
+            counts: {
+                likes: p._count.likes,
+                comments: p._count.comments,
+                saved: p._count.savedBy,
+            },
+            liked: likedSet.has(p.id),
+            saved: savedSet.has(p.id),
+        }));
+
+        const hasMore = posts.length === take;
+        const nextCursor = hasMore ? posts[posts.length - 1].id : null;
+
+        return { items, nextCursor, hasMore };
     }
 
+    async getAllReels(
+        viewerId: number,
+        { cursor, limit },
+    ) {
+        const take = Math.min(Math.max(limit || 20, 1), 100);
+
+        const posts = await this.prisma.post.findMany({
+            where: { isReels: true },
+            orderBy: { id: 'desc' },
+            cursor: cursor ? { id: Number(cursor) } : undefined,
+            skip: cursor ? 1 : 0,
+            take,
+            include: {
+                images: { orderBy: { position: 'asc' } },
+                user: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
+                _count: { select: { likes: true, comments: true, savedBy: true } },
+            },
+        });
+
+        const ids = posts.map(p => p.id);
+
+        let likedSet = new Set<number>();
+        let savedSet = new Set<number>();
+
+        if (ids.length > 0) {
+            const [likes, saved] = await Promise.all([
+                this.prisma.like.findMany({
+                    where: { userId: viewerId, postId: { in: ids } },
+                    select: { postId: true },
+                }),
+                this.prisma.savedPost.findMany({
+                    where: { userId: viewerId, postId: { in: ids } },
+                    select: { postId: true },
+                }),
+            ]);
+
+            const likeIds = likes.map(l => l.postId).filter((id): id is number => typeof id === 'number');
+            const savedIds = saved.map(s => s.postId).filter((id): id is number => typeof id === 'number');
+
+            likedSet = new Set(likeIds);
+            savedSet = new Set(savedIds);
+        }
+
+        const items = posts.map(p => ({
+            id: p.id,
+            caption: p.caption,
+            isReels: p.isReels,
+            videoUrl: p.videoUrl,
+            createdAt: p.createdAt,
+            user: p.user,
+            images: p.images,
+            counts: {
+                likes: p._count.likes,
+                comments: p._count.comments,
+                saved: p._count.savedBy,
+            },
+            liked: likedSet.has(p.id),
+            saved: savedSet.has(p.id),
+        }));
+
+        const hasMore = posts.length === take;
+        const nextCursor = hasMore ? posts[posts.length - 1].id : null;
+
+        return { items, nextCursor };
+    }
+
+    // ===== COMMENTS =====
     async addComment(userId: number, postId: number, content: string) {
         const text = (content ?? '').trim();
         if (!text) throw new BadRequestException('Content is required');
@@ -170,31 +253,109 @@ export class PostsService {
         return comment;
     }
 
-    async getComments(postId: number, page: number, limit: number) {
-        const safePage = Math.max(page || 1, 1);
-        const safeLimit = Math.min(Math.max(limit || 20, 1), 100);
-        const skip = (safePage - 1) * safeLimit;
-        const takePlusOne = safeLimit + 1;
-
+    async getPostComments(viewerId: number, postId: number, { cursor, limit }) {
         const post = await this.prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
         if (!post) throw new NotFoundException('Post not found');
 
-        // Топ-уровень (parentId = null). Если нужны все — убери фильтр parentId.
-        const rows = await this.prisma.comment.findMany({
+        const take = Math.min(Math.max(limit || 20, 1), 100);
+
+        const comments = await this.prisma.comment.findMany({
             where: { postId, parentId: null },
-            orderBy: [{ createdAt: 'desc' as const }, { id: 'desc' as const }],
-            skip,
-            take: takePlusOne,
+            orderBy: { id: 'desc' },
+            cursor: cursor ? { id: Number(cursor) } : undefined,
+            skip: cursor ? 1 : 0,
+            take,
             include: {
                 user: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
                 _count: { select: { likes: true, replies: true } },
             },
         });
 
-        const hasMore = rows.length > safeLimit;
-        const items = rows.slice(0, safeLimit);
+        const ids = comments.map(c => c.id);
 
-        return { items, hasMore, page: safePage, limit: safeLimit };
+        let likedSet = new Set<number>();
+        if (ids.length) {
+            const likes = await this.prisma.commentLike.findMany({
+                where: { userId: viewerId, commentId: { in: ids } },
+                select: { commentId: true },
+            });
+            const likeIds = likes
+                .map(l => l.commentId)
+                .filter((id): id is number => typeof id === 'number');
+
+            likedSet = new Set<number>(likeIds);
+        }
+
+        const items = comments.map(c => ({
+            id: c.id,
+            content: c.content,
+            createdAt: c.createdAt,
+            user: c.user,
+            counts: {
+                likes: c._count.likes,
+                replies: c._count.replies,
+            },
+            liked: likedSet.has(c.id),
+        }));
+
+        const hasMore = comments.length === take;
+        const nextCursor = hasMore ? comments[comments.length - 1].id : null;
+
+        return { items, nextCursor };
+    }
+
+    async getCommentReplies(viewerId: number, commentId: number, { cursor, limit }) {
+        const parent = await this.prisma.comment.findUnique({
+            where: { id: commentId },
+            select: { id: true },
+        });
+        if (!parent) throw new NotFoundException('Comment not found');
+
+        const take = Math.min(Math.max(limit || 20, 1), 100);
+
+        const replies = await this.prisma.comment.findMany({
+            where: { parentId: commentId },
+            orderBy: { id: 'desc' },
+            cursor: cursor ? { id: Number(cursor) } : undefined,
+            skip: cursor ? 1 : 0,
+            take,
+            include: {
+                user: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
+                _count: { select: { likes: true, replies: true } },
+            },
+        });
+
+        const ids = replies.map(r => r.id);
+
+        let likedSet = new Set<number>();
+        if (ids.length) {
+            const likes = await this.prisma.commentLike.findMany({
+                where: { userId: viewerId, commentId: { in: ids } },
+                select: { commentId: true },
+            });
+            const likeIds = likes
+                .map(l => l.commentId)
+                .filter((id): id is number => typeof id === 'number');
+
+            likedSet = new Set<number>(likeIds);
+        }
+
+        const items = replies.map(r => ({
+            id: r.id,
+            content: r.content,
+            createdAt: r.createdAt,
+            user: r.user,
+            counts: {
+                likes: r._count.likes,
+                replies: r._count.replies,
+            },
+            liked: likedSet.has(r.id),
+        }));
+
+        const hasMore = replies.length === take;
+        const nextCursor = hasMore ? replies[replies.length - 1].id : null;
+
+        return { items, nextCursor };
     }
 
     // ===== LIKES =====
@@ -202,7 +363,6 @@ export class PostsService {
         const post = await this.prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
         if (!post) throw new NotFoundException('Post not found');
 
-        // upsert по уникальному композитному ключу (userId, postId)
         await this.prisma.like.upsert({
             where: { userId_postId: { userId, postId } },
             create: { userId, postId },

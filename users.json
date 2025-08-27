@@ -1,0 +1,192 @@
+[
+    {
+        "username": "user_1",
+        "fullName": "Test User1",
+        "phone": "+79012340001",
+        "email": "user1@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "bio": "Люблю котиков",
+        "avatarUrl": null,
+        "isVerify": true
+    },
+    {
+        "username": "user_2",
+        "fullName": "Test User2",
+        "phone": "+79012340002",
+        "email": "user2@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "avatarUrl": null,
+        "isVerify": true
+    },
+    {
+        "username": "user_3",
+        "fullName": "Test User3",
+        "phone": "+79012340003",
+        "email": "user3@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "bio": "Фронтенд разработчик",
+        "avatarUrl": null,
+        "isVerify": true
+    },
+    {
+        "username": "user_4",
+        "fullName": "Test User4",
+        "phone": "+79012340004",
+        "email": "user4@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "avatarUrl": null,
+        "isVerify": true
+    },
+    {
+        "username": "user_5",
+        "fullName": "Test User5",
+        "phone": "+79012340005",
+        "email": "user5@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "bio": "Пью слишком много кофе",
+        "avatarUrl": null,
+        "isVerify": true
+    },
+    {
+        "username": "user_6",
+        "fullName": "Test User6",
+        "phone": "+79012340006",
+        "email": "user6@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "avatarUrl": null,
+        "isVerify": true
+    },
+    {
+        "username": "user_7",
+        "fullName": "Test User7",
+        "phone": "+79012340007",
+        "email": "user7@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "bio": "Фанат Flutter",
+        "avatarUrl": null,
+        "isVerify": true
+    },
+    {
+        "username": "user_8",
+        "fullName": "Test User8",
+        "phone": "+79012340008",
+        "email": "user8@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "avatarUrl": null,
+        "isVerify": true
+    },
+    {
+        "username": "user_9",
+        "fullName": "Test User9",
+        "phone": "+79012340009",
+        "email": "user9@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "bio": "Бегаю по утрам",
+        "avatarUrl": null,
+        "isVerify": true
+    },
+    {
+        "username": "user_10",
+        "fullName": "Test User10",
+        "phone": "+79012340010",
+        "email": "user10@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "avatarUrl": null,
+        "isVerify": true
+    },
+    {
+        "username": "user_11",
+        "fullName": "Test User11",
+        "phone": "+79012340011",
+        "email": "user11@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "bio": "Обожаю горные походы",
+        "avatarUrl": null,
+        "isVerify": true
+    },
+    {
+        "username": "user_12",
+        "fullName": "Test User12",
+        "phone": "+79012340012",
+        "email": "user12@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "avatarUrl": null,
+        "isVerify": true
+    },
+    {
+        "username": "user_13",
+        "fullName": "Test User13",
+        "phone": "+79012340013",
+        "email": "user13@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "bio": "Собираю ретро-консоли",
+        "avatarUrl": null,
+        "isVerify": true
+    },
+    {
+        "username": "user_14",
+        "fullName": "Test User14",
+        "phone": "+79012340014",
+        "email": "user14@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "avatarUrl": null,
+        "isVerify": true
+    },
+    {
+        "username": "user_15",
+        "fullName": "Test User15",
+        "phone": "+79012340015",
+        "email": "user15@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "bio": "Криптоэнтузиаст",
+        "avatarUrl": null,
+        "isVerify": true
+    },
+    {
+        "username": "user_16",
+        "fullName": "Test User16",
+        "phone": "+79012340016",
+        "email": "user16@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "avatarUrl": null,
+        "isVerify": true
+    },
+    {
+        "username": "user_17",
+        "fullName": "Test User17",
+        "phone": "+79012340017",
+        "email": "user17@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "bio": "Фотограф-любитель",
+        "avatarUrl": null,
+        "isVerify": true
+    },
+    {
+        "username": "user_18",
+        "fullName": "Test User18",
+        "phone": "+79012340018",
+        "email": "user18@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "avatarUrl": null,
+        "isVerify": true
+    },
+    {
+        "username": "user_19",
+        "fullName": "Test User19",
+        "phone": "+79012340019",
+        "email": "user19@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "bio": "Играю в шахматы",
+        "avatarUrl": null,
+        "isVerify": true
+    },
+    {
+        "username": "user_20",
+        "fullName": "Test User20",
+        "phone": "+79012340020",
+        "email": "user20@gmail.com",
+        "passwordHash": "$2b$10$y.UmNsPavLug0hq9Nkq/z.DDgiN6U5HnaWhHg1CFx3RUkLDlpiu3K",
+        "avatarUrl": null,
+        "isVerify": true
+    }
+]

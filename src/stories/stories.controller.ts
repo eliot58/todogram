@@ -49,13 +49,6 @@ export class StoriesController {
                 } else {
                     throw new BadRequestException(`Unexpected file field: ${part.fieldname}`);
                 }
-            } else {
-                if (part.fieldname === 'expiresInHours') {
-                    const n = Number(part.value);
-                    if (!Number.isFinite(n)) throw new BadRequestException('expiresInHours must be a number');
-                    expiresInHours = Math.min(Math.max(Math.trunc(n), 1), 168);
-                } else {
-                }
             }
         }
 
@@ -75,15 +68,5 @@ export class StoriesController {
     @UseGuards(JwtAuthGuard)
     async remove(@Req() request: RequestWithAuth, @Param('id') id: number) {
         return this.storiesService.delete(request.userId, id);
-    }
-
-    @Get('following/active')
-    @UseGuards(JwtAuthGuard)
-    async getFollowingActive(
-      @Req() request: RequestWithAuth,
-      @Query('page') page: number,
-      @Query('limit') limit: number,
-    ) {
-      return this.storiesService.getFollowingActive(request.userId, page, limit);
     }
 }

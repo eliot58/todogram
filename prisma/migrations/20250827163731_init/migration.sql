@@ -11,6 +11,8 @@ CREATE TABLE "public"."User" (
     "isVerify" BOOLEAN NOT NULL DEFAULT false,
     "verifiedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "followersCount" INTEGER NOT NULL DEFAULT 0,
+    "followingCount" INTEGER NOT NULL DEFAULT 0,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
@@ -38,16 +40,6 @@ CREATE TABLE "public"."Post" (
 );
 
 -- CreateTable
-CREATE TABLE "public"."SavedPost" (
-    "id" SERIAL NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "userId" INTEGER NOT NULL,
-    "postId" INTEGER NOT NULL,
-
-    CONSTRAINT "SavedPost_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "public"."PostImage" (
     "id" SERIAL NOT NULL,
     "url" TEXT NOT NULL,
@@ -56,6 +48,16 @@ CREATE TABLE "public"."PostImage" (
     "postId" INTEGER NOT NULL,
 
     CONSTRAINT "PostImage_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."SavedPost" (
+    "id" SERIAL NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "userId" INTEGER NOT NULL,
+    "postId" INTEGER NOT NULL,
+
+    CONSTRAINT "SavedPost_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -128,6 +130,9 @@ CREATE INDEX "Post_isReels_idx" ON "public"."Post"("isReels");
 CREATE INDEX "Post_userId_createdAt_idx" ON "public"."Post"("userId", "createdAt");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "PostImage_postId_position_key" ON "public"."PostImage"("postId", "position");
+
+-- CreateIndex
 CREATE INDEX "SavedPost_userId_createdAt_idx" ON "public"."SavedPost"("userId", "createdAt");
 
 -- CreateIndex
@@ -135,9 +140,6 @@ CREATE INDEX "SavedPost_postId_idx" ON "public"."SavedPost"("postId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "SavedPost_userId_postId_key" ON "public"."SavedPost"("userId", "postId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "PostImage_postId_position_key" ON "public"."PostImage"("postId", "position");
 
 -- CreateIndex
 CREATE INDEX "Story_userId_expiresAt_idx" ON "public"."Story"("userId", "expiresAt");
@@ -173,13 +175,13 @@ ALTER TABLE "public"."Follower" ADD CONSTRAINT "Follower_followingId_fkey" FOREI
 ALTER TABLE "public"."Post" ADD CONSTRAINT "Post_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "public"."PostImage" ADD CONSTRAINT "PostImage_postId_fkey" FOREIGN KEY ("postId") REFERENCES "public"."Post"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "public"."SavedPost" ADD CONSTRAINT "SavedPost_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."SavedPost" ADD CONSTRAINT "SavedPost_postId_fkey" FOREIGN KEY ("postId") REFERENCES "public"."Post"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "public"."PostImage" ADD CONSTRAINT "PostImage_postId_fkey" FOREIGN KEY ("postId") REFERENCES "public"."Post"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."Story" ADD CONSTRAINT "Story_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

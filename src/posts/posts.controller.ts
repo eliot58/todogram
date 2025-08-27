@@ -2,14 +2,15 @@ import { Controller, Delete, Get, Param, Post, Req, UseGuards, BadRequestExcepti
 import { PostsService } from './posts.service';
 import { RequestWithAuth } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
 
 @Controller('posts')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 export class PostsController {
     constructor(private postsService: PostsService) { }
 
     @Post()
-    @ApiBearerAuth()
     @ApiConsumes('multipart/form-data')
     @ApiBody({
         schema: {
@@ -25,7 +26,6 @@ export class PostsController {
             },
         },
     })
-    @UseGuards(JwtAuthGuard)
     async create(@Req() request: RequestWithAuth) {
         const parts = request.parts();
 
@@ -69,53 +69,42 @@ export class PostsController {
         );
     }
 
-    @Get()
-    @UseGuards(JwtAuthGuard)
-    async getAll() {
-        return this.postsService.findAll();
-    }
-
     @Delete(':id')
-    @ApiBearerAuth()
-    @UseGuards(JwtAuthGuard)
     async remove(@Req() request: RequestWithAuth, @Param('id') id: number) {
         return this.postsService.delete(request.userId, id);
     }
 
-    @Get('feed')
-    @ApiBearerAuth()
-    @UseGuards(JwtAuthGuard)
-    async feed(
+    @Get()
+    @ApiQuery({ name: 'cursor', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    async getAllPosts(
         @Req() request: RequestWithAuth,
-        @Query('page') page: number,
-        @Query('limit') limit: number
+        @Query('cursor') cursor?: number,
+        @Query('limit') limit: number = 20,
     ) {
-        return this.postsService.findFeed(request.userId, limit, page);
+        return this.postsService.getAllPosts(request.userId, { cursor, limit });
     }
 
-    @Get(':id/comments')
-    @ApiBearerAuth()
-    @UseGuards(JwtAuthGuard)
-    async listComments(
+    @Get('reels')
+    @ApiQuery({ name: 'cursor', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    async getAllReels(
         @Req() request: RequestWithAuth,
-        @Param('id') id: number,
-        @Query('page') page: number,
-        @Query('limit') limit: number,
+        @Query('cursor') cursor?: number,
+        @Query('limit') limit: number = 20,
     ) {
-        return this.postsService.getComments(id, page, limit);
+        return this.postsService.getAllReels(request.userId, { cursor, limit });
     }
 
+    // ---------- COMMENTS ----------
     @Post(':id/comments')
-    @ApiBearerAuth()
-    @UseGuards(JwtAuthGuard)
     @ApiConsumes('application/json')
     @ApiBody({
         schema: {
             type: 'object',
             required: ['content'],
             properties: {
-                content: { type: 'string', minLength: 1, maxLength: 1000 },
-                parentId: { type: 'number', nullable: true },
+                content: { type: 'string', minLength: 1, maxLength: 1000 }
             },
         },
     })
@@ -127,32 +116,48 @@ export class PostsController {
         return this.postsService.addComment(request.userId, id, body.content);
     }
 
+    @Get(':id/comments')
+    @ApiQuery({ name: 'cursor', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    async getPostComments(
+        @Req() request: RequestWithAuth,
+        @Param('id') id: number,
+        @Query('cursor') cursor?: number,
+        @Query('limit') limit: number = 20,
+    ) {
+        return this.postsService.getPostComments(request.userId, id, { cursor, limit });
+    }
+
+    @Get('comments/:commentId/replies')
+    @ApiQuery({ name: 'cursor', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    async getCommentReplies(
+        @Req() request: RequestWithAuth,
+        @Param('commentId') commentId: number,
+        @Query('cursor') cursor?: number,
+        @Query('limit') limit: number = 20,
+    ) {
+        return this.postsService.getCommentReplies(request.userId, commentId, { cursor, limit });
+    }
+
     // ---------- LIKES ----------
     @Post(':id/like')
-    @ApiBearerAuth()
-    @UseGuards(JwtAuthGuard)
     async like(@Req() request: RequestWithAuth, @Param('id') id: number) {
         return this.postsService.likePost(request.userId, id);
     }
 
     @Delete(':id/like')
-    @ApiBearerAuth()
-    @UseGuards(JwtAuthGuard)
     async unlike(@Req() request: RequestWithAuth, @Param('id') id: number) {
         return this.postsService.unlikePost(request.userId, id);
     }
 
     // ---------- SAVES ----------
     @Post(':id/save')
-    @ApiBearerAuth()
-    @UseGuards(JwtAuthGuard)
     async save(@Req() request: RequestWithAuth, @Param('id') id: number) {
         return this.postsService.savePost(request.userId, id);
     }
 
     @Delete(':id/save')
-    @ApiBearerAuth()
-    @UseGuards(JwtAuthGuard)
     async unsave(@Req() request: RequestWithAuth, @Param('id') id: number) {
         return this.postsService.unsavePost(request.userId, id);
     }

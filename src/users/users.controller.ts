@@ -2,16 +2,16 @@ import { BadRequestException, Controller, Get, Param, Patch, Post, Query, Req, U
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequestWithAuth } from '../auth/auth.types';
-import { ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { isImage } from '../helper/mime';
 
 @Controller('users')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 export class UsersController {
     constructor(private readonly usersService: UsersService) { }
 
     @Get('me')
-    @UseGuards(JwtAuthGuard)
     async getMe(@Req() request: RequestWithAuth) {
         return this.usersService.getUserById(request.userId);
     }
@@ -30,7 +30,6 @@ export class UsersController {
             },
         },
     })
-    @UseGuards(JwtAuthGuard)
     async updateProfile(@Req() request: RequestWithAuth) {
         const parts = request.parts();
 
@@ -63,53 +62,97 @@ export class UsersController {
         return this.usersService.updateProfile(request.userId, dto, avatar);
     }
 
-    @Get('followers')
-    @UseGuards(JwtAuthGuard)
-    async getFollowers(
-        @Req() request: RequestWithAuth,
-        @Query('page') page: number,
-        @Query('limit') limit: number
-    ) {
-        return this.usersService.getFollowers(request.userId, page, limit);
-    }
-
-    @Get('following')
-    @UseGuards(JwtAuthGuard)
-    async getFollowing(
-        @Req() request: RequestWithAuth,
-        @Query('page') page: number,
-        @Query('limit') limit: number
-    ) {
-        return this.usersService.getFollowing(request.userId, page, limit);
-    }
-
     @Post(':id/follow')
-    @UseGuards(JwtAuthGuard)
     async follow(@Req() request: RequestWithAuth, @Param('id') id: number) {
         return this.usersService.follow(request.userId, id);
     }
 
     @Post(':id/unfollow')
-    @UseGuards(JwtAuthGuard)
     async unfollow(@Req() request: RequestWithAuth, @Param('id') id: number) {
         return this.usersService.unfollow(request.userId, id);
     }
 
-    @Get(':id/posts')
-    async getUserPosts(
-        @Param('id') id: number,
-        @Query('page') page: number,
-        @Query('limit') limit: number,
+    @Get('followers')
+    @ApiQuery({
+        name: 'cursor',
+        required: false,
+        type: Number,
+    })
+    @ApiQuery({
+        name: 'limit',
+        required: false,
+        type: Number,
+    })
+    async getFollowers(
+        @Req() request: RequestWithAuth,
+        @Query('cursor') cursor?: number,
+        @Query('limit') limit: number = 20,
     ) {
-        return this.usersService.getUserPosts(id, page, limit);
+        return this.usersService.getFollowers(request.userId, cursor, limit);
+    }
+
+    @Get('following')
+    @ApiQuery({
+        name: 'cursor',
+        required: false,
+        type: Number,
+    })
+    @ApiQuery({
+        name: 'limit',
+        required: false,
+        type: Number,
+    })
+    async getFollowing(
+        @Req() request: RequestWithAuth,
+        @Query('cursor') cursor?: number,
+        @Query('limit') limit: number = 20,
+    ) {
+        return this.usersService.getFollowing(request.userId, cursor, limit);
+    }
+
+    @Get(':id/posts')
+    @ApiQuery({ name: 'cursor', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    async getUserPosts(
+        @Req() request: RequestWithAuth,
+        @Param('id') id: number,
+        @Query('cursor') cursor?: number,
+        @Query('limit') limit: number = 20,
+    ) {
+        return this.usersService.getUserPublications(request.userId, id, {
+            isReels: false,
+            cursor,
+            limit,
+        });
     }
 
     @Get(':id/reels')
+    @ApiQuery({ name: 'cursor', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
     async getUserReels(
+        @Req() request: RequestWithAuth,
         @Param('id') id: number,
-        @Query('page') page: number,
-        @Query('limit') limit: number,
+        @Query('cursor') cursor?: number,
+        @Query('limit') limit: number = 20,
     ) {
-        return this.usersService.getUserReels(id, page, limit);
+        return this.usersService.getUserPublications(request.userId, id, {
+            isReels: true,
+            cursor,
+            limit,
+        });
+    }
+
+    @Get('feed')
+    @ApiQuery({ name: 'cursor', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    async getFollowedPosts(
+        @Req() request: RequestWithAuth,
+        @Query('cursor') cursor?: number,
+        @Query('limit') limit: number = 20,
+    ) {
+        return this.usersService.getFollowedPublications(request.userId, {
+            cursor,
+            limit,
+        });
     }
 }
