@@ -162,7 +162,7 @@ export class UsersService {
                 followedAt: r.createdAt,
                 user: r.follower,
             })),
-            nextCursor: hasMore ? String(slice[slice.length - 1].id) : null,
+            nextCursor: hasMore ? slice[slice.length - 1].id : null,
         };
     }
 
@@ -195,7 +195,7 @@ export class UsersService {
                 followedAt: r.createdAt,
                 user: r.following,
             })),
-            nextCursor: hasMore ? String(slice[slice.length - 1].id) : null,
+            nextCursor: hasMore ? slice[slice.length - 1].id : null,
         };
     }
 
