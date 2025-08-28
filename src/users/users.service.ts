@@ -14,8 +14,10 @@ export class UsersService {
                 id: true,
                 username: true,
                 fullName: true,
-                email: true,
                 bio: true,
+                followersCount: true,
+                followingCount: true,
+                postCount: true,
                 avatarUrl: true,
                 isVerify: true,
                 createdAt: true,
@@ -354,7 +356,7 @@ export class UsersService {
     async searchUsers(viewerId: number, q?: string, cursor?: number, limit = 20) {
         const query = (q ?? '').trim();
         if (query.length < 1) throw new BadRequestException('Query must be at least 1 characters long');
-        
+
         const take = Math.min(Math.max(limit || 20, 1), 100);
 
         const where: Prisma.UserWhereInput = {
