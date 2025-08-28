@@ -29,6 +29,7 @@ model User {
 
   followersCount   Int     @default(0)
   followingCount   Int     @default(0)
+  postCount        Int     @default(0)
 
   posts          Post[]
   stories        Story[]

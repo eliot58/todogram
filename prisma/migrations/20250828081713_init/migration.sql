@@ -13,6 +13,7 @@ CREATE TABLE "public"."User" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "followersCount" INTEGER NOT NULL DEFAULT 0,
     "followingCount" INTEGER NOT NULL DEFAULT 0,
+    "postCount" INTEGER NOT NULL DEFAULT 0,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );

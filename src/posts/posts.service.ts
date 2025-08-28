@@ -36,61 +36,92 @@ export class PostsService {
         if (data.isReels) {
             const videoUrl = await this.s3.uploadBuffer(files.video!.buffer, files.video!.mimetype, 'posts/videos');
 
-            const post = await this.prisma.post.create({
-                data: {
-                    caption: data.caption,
-                    isReels: true,
-                    videoUrl,
-                    userId: data.userId,
-                },
-                include: {
-                    images: true,
-                    user: { select: { id: true, username: true, avatarUrl: true } },
-                    _count: { select: { likes: true, comments: true, savedBy: true } },
-                },
-            });
+            try {
+                const post = await this.prisma.$transaction(async (tx) => {
+                    const created = await tx.post.create({
+                        data: {
+                            caption: data.caption,
+                            isReels: true,
+                            videoUrl,
+                            userId: data.userId,
+                        },
+                        include: {
+                            images: true,
+                            user: { select: { id: true, username: true, avatarUrl: true } },
+                            _count: { select: { likes: true, comments: true, savedBy: true } },
+                        },
+                    });
 
-            return post;
+                    await tx.user.update({
+                        where: { id: data.userId },
+                        data: { postCount: { increment: 1 } },
+                    });
+
+                    return created;
+                });
+
+                return post;
+            } catch (e) { }
         } else {
             const uploaded = await Promise.all(
                 files.images.map((img, idx) =>
-                    this.s3.uploadBuffer(img.buffer, img.mimetype, 'posts/images').then((url) => ({
-                        url,
-                        position: idx,
-                    }))
+                    this.s3.uploadBuffer(img.buffer, img.mimetype, 'posts/images').then((url) => ({ url, position: idx }))
                 )
             );
 
-            const post = await this.prisma.post.create({
-                data: {
-                    caption: data.caption,
-                    isReels: false,
-                    userId: data.userId,
-                    images: {
-                        create: uploaded.map((u) => ({ url: u.url, position: u.position })),
-                    },
-                },
-                include: {
-                    images: { orderBy: { position: 'asc' } },
-                    user: { select: { id: true, username: true, avatarUrl: true } },
-                    _count: { select: { likes: true, comments: true, savedBy: true } },
-                },
-            });
+            try {
+                const post = await this.prisma.$transaction(async (tx) => {
+                    const created = await tx.post.create({
+                        data: {
+                            caption: data.caption,
+                            isReels: false,
+                            userId: data.userId,
+                            images: { create: uploaded.map((u) => ({ url: u.url, position: u.position })) },
+                        },
+                        include: {
+                            images: { orderBy: { position: 'asc' } },
+                            user: { select: { id: true, username: true, avatarUrl: true } },
+                            _count: { select: { likes: true, comments: true, savedBy: true } },
+                        },
+                    });
 
-            return post;
+                    await tx.user.update({
+                        where: { id: data.userId },
+                        data: { postCount: { increment: 1 } },
+                    });
+
+                    return created;
+                });
+
+                return post;
+            } catch (e) { }
         }
     }
 
     async delete(userId: number, id: number) {
         const post = await this.prisma.post.findUnique({
             where: { id },
-            select: { userId: true },
+            select: {
+                userId: true,
+                isReels: true,
+                videoUrl: true,
+                images: { select: { url: true } },
+            },
         });
 
         if (!post) throw new ForbiddenException('Post not found');
         if (post.userId !== userId) throw new ForbiddenException('You are not allowed to delete this post');
 
-        await this.prisma.post.delete({ where: { id } });
+        await this.prisma.$transaction(async (tx) => {
+
+            await tx.post.delete({ where: { id } });
+
+            await tx.user.update({
+                where: { id: userId },
+                data: { postCount: { decrement: 1 } },
+            });
+        });
+
         return { message: 'Deleted' };
     }
 
