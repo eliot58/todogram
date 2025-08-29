@@ -52,6 +52,16 @@ CREATE TABLE "public"."PostImage" (
 );
 
 -- CreateTable
+CREATE TABLE "public"."Like" (
+    "id" SERIAL NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "userId" INTEGER NOT NULL,
+    "postId" INTEGER,
+
+    CONSTRAINT "Like_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "public"."SavedPost" (
     "id" SERIAL NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -105,16 +115,6 @@ CREATE TABLE "public"."CommentLike" (
     CONSTRAINT "CommentLike_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "public"."Like" (
-    "id" SERIAL NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "userId" INTEGER NOT NULL,
-    "postId" INTEGER,
-
-    CONSTRAINT "Like_pkey" PRIMARY KEY ("id")
-);
-
 -- CreateIndex
 CREATE UNIQUE INDEX "User_username_key" ON "public"."User"("username");
 
@@ -122,16 +122,31 @@ CREATE UNIQUE INDEX "User_username_key" ON "public"."User"("username");
 CREATE UNIQUE INDEX "User_email_key" ON "public"."User"("email");
 
 -- CreateIndex
+CREATE INDEX "Follower_followerId_createdAt_idx" ON "public"."Follower"("followerId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "Follower_followingId_createdAt_idx" ON "public"."Follower"("followingId", "createdAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Follower_followerId_followingId_key" ON "public"."Follower"("followerId", "followingId");
 
 -- CreateIndex
-CREATE INDEX "Post_isReels_idx" ON "public"."Post"("isReels");
+CREATE INDEX "Post_isReels_id_idx" ON "public"."Post"("isReels", "id");
 
 -- CreateIndex
 CREATE INDEX "Post_userId_createdAt_idx" ON "public"."Post"("userId", "createdAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "PostImage_postId_position_key" ON "public"."PostImage"("postId", "position");
+
+-- CreateIndex
+CREATE INDEX "Like_userId_createdAt_idx" ON "public"."Like"("userId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "Like_postId_idx" ON "public"."Like"("postId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Like_userId_postId_key" ON "public"."Like"("userId", "postId");
 
 -- CreateIndex
 CREATE INDEX "SavedPost_userId_createdAt_idx" ON "public"."SavedPost"("userId", "createdAt");
@@ -155,6 +170,15 @@ CREATE INDEX "Story_userId_createdAt_idx" ON "public"."Story"("userId", "created
 CREATE UNIQUE INDEX "StoryView_storyId_viewerId_key" ON "public"."StoryView"("storyId", "viewerId");
 
 -- CreateIndex
+CREATE INDEX "Comment_postId_parentId_id_idx" ON "public"."Comment"("postId", "parentId", "id");
+
+-- CreateIndex
+CREATE INDEX "Comment_parentId_id_idx" ON "public"."Comment"("parentId", "id");
+
+-- CreateIndex
+CREATE INDEX "Comment_userId_createdAt_idx" ON "public"."Comment"("userId", "createdAt");
+
+-- CreateIndex
 CREATE INDEX "CommentLike_commentId_idx" ON "public"."CommentLike"("commentId");
 
 -- CreateIndex
@@ -163,20 +187,23 @@ CREATE INDEX "CommentLike_userId_createdAt_idx" ON "public"."CommentLike"("userI
 -- CreateIndex
 CREATE UNIQUE INDEX "CommentLike_userId_commentId_key" ON "public"."CommentLike"("userId", "commentId");
 
--- CreateIndex
-CREATE UNIQUE INDEX "Like_userId_postId_key" ON "public"."Like"("userId", "postId");
+-- AddForeignKey
+ALTER TABLE "public"."Follower" ADD CONSTRAINT "Follower_followerId_fkey" FOREIGN KEY ("followerId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."Follower" ADD CONSTRAINT "Follower_followerId_fkey" FOREIGN KEY ("followerId") REFERENCES "public"."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "public"."Follower" ADD CONSTRAINT "Follower_followingId_fkey" FOREIGN KEY ("followingId") REFERENCES "public"."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."Follower" ADD CONSTRAINT "Follower_followingId_fkey" FOREIGN KEY ("followingId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."Post" ADD CONSTRAINT "Post_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."PostImage" ADD CONSTRAINT "PostImage_postId_fkey" FOREIGN KEY ("postId") REFERENCES "public"."Post"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Like" ADD CONSTRAINT "Like_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Like" ADD CONSTRAINT "Like_postId_fkey" FOREIGN KEY ("postId") REFERENCES "public"."Post"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."SavedPost" ADD CONSTRAINT "SavedPost_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -207,9 +234,3 @@ ALTER TABLE "public"."CommentLike" ADD CONSTRAINT "CommentLike_userId_fkey" FORE
 
 -- AddForeignKey
 ALTER TABLE "public"."CommentLike" ADD CONSTRAINT "CommentLike_commentId_fkey" FOREIGN KEY ("commentId") REFERENCES "public"."Comment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "public"."Like" ADD CONSTRAINT "Like_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "public"."Like" ADD CONSTRAINT "Like_postId_fkey" FOREIGN KEY ("postId") REFERENCES "public"."Post"("id") ON DELETE SET NULL ON UPDATE CASCADE;
