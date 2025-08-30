@@ -222,6 +222,7 @@ export class UsersService {
                 images: { orderBy: { position: 'asc' } },
                 likes: { where: { userId: viewerId }, select: { id: true }, take: 1 },
                 savedBy: { where: { userId: viewerId }, select: { id: true }, take: 1 },
+
                 user: {
                     select: {
                         id: true,
@@ -240,6 +241,7 @@ export class UsersService {
             caption: p.caption,
             isReels: p.isReels,
             videoUrl: p.videoUrl,
+            thumbnail: p.thumbnail,
             createdAt: p.createdAt,
             user: {
                 id: p.user.id,
@@ -309,6 +311,7 @@ export class UsersService {
             caption: p.caption,
             isReels: p.isReels,
             videoUrl: p.videoUrl,
+            thumbnail: p.thumbnail,
             createdAt: p.createdAt,
             user: {
                 id: p.user.id,

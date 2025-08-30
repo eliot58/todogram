@@ -183,6 +183,7 @@ export class PostsService {
             caption: p.caption,
             isReels: p.isReels,
             videoUrl: p.videoUrl,
+            thumbnail: p.thumbnail,
             createdAt: p.createdAt,
             user: {
                 id: p.user.id,
@@ -239,6 +240,7 @@ export class PostsService {
             caption: p.caption,
             isReels: p.isReels,
             videoUrl: p.videoUrl,
+            thumbnail: p.thumbnail,
             createdAt: p.createdAt,
             user: { id: p.user.id, username: p.user.username, fullName: p.user.fullName, avatarUrl: p.user.avatarUrl },
             images: p.images,
