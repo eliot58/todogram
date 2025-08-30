@@ -60,6 +60,7 @@ model Post {
   caption     String?
   isReels     Boolean     @default(false)
   videoUrl    String?
+  thumbnail   String?
   createdAt   DateTime    @default(now())
 
   user        User        @relation(fields: [userId], references: [id])
@@ -69,6 +70,8 @@ model Post {
   likes       Like[]
   comments    Comment[]
   savedBy     SavedPost[]
+
+  shareCount  Int         @default(0)
 
   @@index([isReels, id])
   @@index([userId, createdAt])

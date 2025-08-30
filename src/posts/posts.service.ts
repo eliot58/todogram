@@ -12,29 +12,53 @@ export class PostsService {
 
     private assertPayload(
         input: { isReels: boolean },
-        files: { images: ImageFile[]; video: VideoFile | null }
+        files: { images: ImageFile[]; video: VideoFile | null; thumbnail: ImageFile | null }
     ) {
         if (input.isReels) {
-            if (!files.video) throw new BadRequestException('video is required for reels');
-            if (files.images.length > 0) throw new BadRequestException('images are not allowed for reels');
-            if (!isVideo(files.video.mimetype)) throw new BadRequestException('Invalid video mime type');
+            if (!files.video) {
+                throw new BadRequestException('video is required for reels');
+            }
+            if (files.images.length > 0) {
+                throw new BadRequestException('images are not allowed for reels');
+            }
+            if (!isVideo(files.video.mimetype)) {
+                throw new BadRequestException('Invalid video mime type');
+            }
+
+            if (!files.thumbnail) {
+                throw new BadRequestException('thumbnail is required for reels');
+            }
+            if (!isImage(files.thumbnail.mimetype)) {
+                throw new BadRequestException(`Invalid thumbnail mime type: ${files.thumbnail.mimetype}`);
+            }
         } else {
-            if (files.images.length === 0) throw new BadRequestException('At least one image is required');
-            if (files.video) throw new BadRequestException('video is not allowed for non-reels post');
+            if (files.images.length === 0) {
+                throw new BadRequestException('At least one image is required');
+            }
+            if (files.video) {
+                throw new BadRequestException('video is not allowed for non-reels post');
+            }
+            if (files.thumbnail) {
+                throw new BadRequestException('thumbnail is not allowed for non-reels post');
+            }
             for (const img of files.images) {
-                if (!isImage(img.mimetype)) throw new BadRequestException(`Invalid image mime type: ${img.mimetype}`);
+                if (!isImage(img.mimetype)) {
+                    throw new BadRequestException(`Invalid image mime type: ${img.mimetype}`);
+                }
             }
         }
     }
 
+
     async create(
         data: { caption?: string; isReels: boolean; userId: number },
-        files: { images: ImageFile[]; video: VideoFile | null }
+        files: { images: ImageFile[]; video: VideoFile | null, thumbnail: ImageFile | null }
     ) {
         this.assertPayload(data, files);
 
         if (data.isReels) {
             const videoUrl = await this.s3.uploadBuffer(files.video!.buffer, files.video!.mimetype, 'posts/videos');
+            const thumbnailUrl = await this.s3.uploadBuffer(files.thumbnail!.buffer, files.thumbnail!.mimetype, 'posts/thumbnail');
 
             try {
                 const post = await this.prisma.$transaction(async (tx) => {
@@ -44,6 +68,7 @@ export class PostsService {
                             isReels: true,
                             videoUrl,
                             userId: data.userId,
+                            thumbnail: thumbnailUrl
                         },
                         include: {
                             images: true,
@@ -170,6 +195,7 @@ export class PostsService {
                 likes: p._count.likes,
                 comments: p._count.comments,
                 saved: p._count.savedBy,
+                shared: p.shareCount
             },
             liked: p.likes.length > 0,
             saved: p.savedBy.length > 0,
@@ -216,7 +242,7 @@ export class PostsService {
             createdAt: p.createdAt,
             user: { id: p.user.id, username: p.user.username, fullName: p.user.fullName, avatarUrl: p.user.avatarUrl },
             images: p.images,
-            counts: { likes: p._count.likes, comments: p._count.comments, saved: p._count.savedBy },
+            counts: { likes: p._count.likes, comments: p._count.comments, saved: p._count.savedBy, shared: p.shareCount },
             liked: p.likes.length > 0,
             saved: p.savedBy.length > 0,
             followsAuthor: p.user.followers.length > 0,
@@ -300,40 +326,40 @@ export class PostsService {
         const parent = await this.prisma.comment.findUnique({
             where: { id: commentId },
             select: { id: true },
-          });
-          if (!parent) throw new NotFoundException('Comment not found');
-        
-          const take = Math.min(Math.max(limit || 20, 1), 100);
-        
-          const replies = await this.prisma.comment.findMany({
+        });
+        if (!parent) throw new NotFoundException('Comment not found');
+
+        const take = Math.min(Math.max(limit || 20, 1), 100);
+
+        const replies = await this.prisma.comment.findMany({
             where: { parentId: commentId },
             orderBy: { id: 'desc' },
             cursor: cursor ? { id: cursor } : undefined,
             skip: cursor ? 1 : 0,
             take,
             include: {
-              user: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
-              likes: { where: { userId: viewerId }, select: { id: true }, take: 1 },
-              _count: { select: { likes: true, replies: true } },
+                user: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
+                likes: { where: { userId: viewerId }, select: { id: true }, take: 1 },
+                _count: { select: { likes: true, replies: true } },
             },
-          });
-        
-          const items = replies.map((r) => ({
+        });
+
+        const items = replies.map((r) => ({
             id: r.id,
             content: r.content,
             createdAt: r.createdAt,
             user: r.user,
             counts: {
-              likes: r._count.likes,
-              replies: r._count.replies,
+                likes: r._count.likes,
+                replies: r._count.replies,
             },
             liked: r.likes.length > 0,
-          }));
-        
-          const hasMore = replies.length === take;
-          const nextCursor = hasMore ? replies[replies.length - 1].id : null;
-        
-          return { items, nextCursor };
+        }));
+
+        const hasMore = replies.length === take;
+        const nextCursor = hasMore ? replies[replies.length - 1].id : null;
+
+        return { items, nextCursor };
     }
 
     // ===== LIKES =====

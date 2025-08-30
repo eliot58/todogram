@@ -105,9 +105,10 @@ async function createImagePost(userId) {
 async function createReelPost(userId) {
   const idx = randInt(1, MAX_INDEX);
   const videoUrl = `${VIDEOS_BASE}/${idx}.mp4`;
+  const thumbnail =`${IMAGES_BASE}/${randInt(1, 19)}.jpg`;
   const caption = maybeCaption();
 
-  const data = { userId, isReels: true, videoUrl };
+  const data = { userId, isReels: true, videoUrl, thumbnail };
   if (caption !== null) data.caption = caption;
 
   return prisma.post.create({ data });

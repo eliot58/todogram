@@ -34,8 +34,10 @@ CREATE TABLE "public"."Post" (
     "caption" TEXT,
     "isReels" BOOLEAN NOT NULL DEFAULT false,
     "videoUrl" TEXT,
+    "thumbnail" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "userId" INTEGER NOT NULL,
+    "shareCount" INTEGER NOT NULL DEFAULT 0,
 
     CONSTRAINT "Post_pkey" PRIMARY KEY ("id")
 );

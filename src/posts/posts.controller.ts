@@ -23,6 +23,7 @@ export class PostsController {
                     items: { type: 'string', format: 'binary' },
                 },
                 video: { type: 'string', format: 'binary' },
+                thumbnail: { type: 'string', format: 'binary' },
             },
         },
     })
@@ -32,6 +33,7 @@ export class PostsController {
         const dto: Record<string, any> = {};
         const images: Array<{ buffer: Buffer; filename: string; mimetype: string }> = [];
         let video: { buffer: Buffer; filename: string; mimetype: string } | null = null;
+        let thumbnail: { buffer: Buffer; filename: string; mimetype: string } | null = null;
 
         for await (const part of parts) {
             if (part.type === 'file') {
@@ -44,6 +46,9 @@ export class PostsController {
                 } else if (part.fieldname === 'video') {
                     if (video) throw new BadRequestException('Only one video file is allowed');
                     video = file;
+                } else if (part.fieldname === 'thumbnail') {
+                    if (thumbnail) throw new BadRequestException('Only one thumbnail file is allowed');
+                    thumbnail = file;
                 } else {
                     throw new BadRequestException(`Unexpected file field: ${part.fieldname}`);
                 }
@@ -65,7 +70,7 @@ export class PostsController {
                 isReels,
                 userId: request.userId,
             },
-            { images, video }
+            { images, video, thumbnail }
         );
     }
 

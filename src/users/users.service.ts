@@ -252,6 +252,7 @@ export class UsersService {
                 likes: p._count.likes,
                 comments: p._count.comments,
                 saved: p._count.savedBy,
+                shared: p.shareCount
             },
             liked: p.likes.length > 0,
             saved: p.savedBy.length > 0,
@@ -320,6 +321,7 @@ export class UsersService {
                 likes: p._count.likes,
                 comments: p._count.comments,
                 saved: p._count.savedBy,
+                shared: p.shareCount
             },
             liked: p.likes.length > 0,
             saved: p.savedBy.length > 0,
