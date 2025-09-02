@@ -168,4 +168,36 @@ export class UsersController {
     ) {
         return this.usersService.searchUsers(request.userId, q, cursor, limit);
     }
+
+    @Get(':id')
+    async getUserById(
+        @Req() request: RequestWithAuth,
+        @Param('id') id: number,
+    ) {
+        return this.usersService.getUserPublicProfile(request.userId, id);
+    }
+
+    @Get(':id/followers')
+    @ApiQuery({ name: 'cursor', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    async getUserFollowersById(
+        @Req() request: RequestWithAuth,
+        @Param('id') id: number,
+        @Query('cursor') cursor?: number,
+        @Query('limit') limit: number = 20,
+    ) {
+        return this.usersService.getFollowersOfUser(request.userId, id, cursor, limit);
+    }
+
+    @Get(':id/following')
+    @ApiQuery({ name: 'cursor', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    async getUserFollowingById(
+        @Req() request: RequestWithAuth,
+        @Param('id') id: number,
+        @Query('cursor') cursor?: number,
+        @Query('limit') limit: number = 20,
+    ) {
+        return this.usersService.getFollowingOfUser(request.userId, id, cursor, limit);
+    }
 }

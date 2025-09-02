@@ -377,4 +377,171 @@ export class UsersService {
         const nextCursor = hasMore ? users[users.length - 1].id : null;
         return { items, nextCursor };
     }
+
+    async getUserPublicProfile(viewerId: number, userId: number) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                username: true,
+                fullName: true,
+                avatarUrl: true,
+                bio: true,
+                _count: { select: { followers: true, following: true } },
+                followers: {
+                    where: { followerId: viewerId },
+                    select: { id: true },
+                    take: 1,
+                },
+                following: {
+                    where: { followingId: viewerId },
+                    select: { id: true },
+                    take: 1,
+                },
+            },
+        });
+
+        if (!user) throw new NotFoundException('User not found');
+
+        const isFollowedByViewer = user.followers.length > 0;
+        const isFollowingViewer = user.following.length > 0;
+
+        return {
+            id: user.id,
+            username: user.username,
+            fullName: user.fullName,
+            avatarUrl: user.avatarUrl,
+            bio: user.bio,
+            counts: {
+                followers: user._count.followers,
+                following: user._count.following,
+            },
+            viewer: {
+                isFollowing: isFollowedByViewer,
+                isFollowedBy: isFollowingViewer,
+            },
+        };
+    }
+
+    async getFollowersOfUser(
+        viewerId: number,
+        userId: number,
+        cursor?: number,
+        limit: number = 20,
+    ) {
+        const exists = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+        if (!exists) throw new NotFoundException('User not found');
+
+        const take = Math.min(Math.max(limit || 20, 1), 100);
+
+        const rows = await this.prisma.follower.findMany({
+            where: { followingId: userId },
+            orderBy: { id: 'desc' },
+            cursor: cursor ? { id: cursor } : undefined,
+            skip: cursor ? 1 : 0,
+            take,
+            include: {
+                follower: {
+                    select: {
+                        id: true,
+                        username: true,
+                        fullName: true,
+                        avatarUrl: true,
+                        _count: { select: { followers: true, following: true } },
+                        followers: {
+                            where: { followerId: viewerId },
+                            select: { id: true },
+                            take: 1,
+                        },
+                        following: {
+                            where: { followingId: viewerId },
+                            select: { id: true },
+                            take: 1,
+                        },
+                    },
+                },
+            },
+        });
+
+        const items = rows.map(({ follower }) => ({
+            id: follower.id,
+            username: follower.username,
+            fullName: follower.fullName,
+            avatarUrl: follower.avatarUrl,
+            counts: {
+                followers: follower._count.followers,
+                following: follower._count.following,
+            },
+            viewer: {
+                isFollowing: follower.followers.length > 0,
+                isFollowedBy: follower.following.length > 0,
+            },
+            isMe: follower.id === viewerId,
+        }));
+
+        const nextCursor = rows.length === take ? rows[rows.length - 1].id : null;
+
+        return { items, nextCursor };
+    }
+
+    async getFollowingOfUser(
+        viewerId: number,
+        userId: number,
+        cursor?: number,
+        limit: number = 20,
+    ) {
+        const exists = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+        if (!exists) throw new NotFoundException('User not found');
+
+        const take = Math.min(Math.max(limit || 20, 1), 100);
+
+        const rows = await this.prisma.follower.findMany({
+            where: { followerId: userId },
+            orderBy: { id: 'desc' },
+            cursor: cursor ? { id: cursor } : undefined,
+            skip: cursor ? 1 : 0,
+            take,
+            include: {
+                following: {
+                    select: {
+                        id: true,
+                        username: true,
+                        fullName: true,
+                        avatarUrl: true,
+                        _count: { select: { followers: true, following: true } },
+                        followers: {
+                            where: { followerId: viewerId },
+                            select: { id: true },
+                            take: 1,
+                        },
+                        following: {
+                            where: { followingId: viewerId },
+                            select: { id: true },
+                            take: 1,
+                        },
+                    },
+                },
+            },
+        });
+
+        const items = rows.map(({ following }) => ({
+            id: following.id,
+            username: following.username,
+            fullName: following.fullName,
+            avatarUrl: following.avatarUrl,
+            counts: {
+                followers: following._count.followers,
+                following: following._count.following,
+            },
+            viewer: {
+                isFollowing: following.followers.length > 0,
+                isFollowedBy: following.following.length > 0,
+            },
+            isMe: following.id === viewerId,
+        }));
+
+        const nextCursor = rows.length === take ? rows[rows.length - 1].id : null;
+
+        return { items, nextCursor };
+    }
 }
