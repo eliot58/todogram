@@ -30,9 +30,7 @@ export class UsersService {
         dto: any,
         avatar?: { buffer: Buffer; filename: string; mimetype: string } | null
     ) {
-        if ('avatar' in dto) {
-            delete dto.avatar;
-        }
+        if ('avatar' in dto) delete dto.avatar;
 
         if (dto.username) {
             const exists = await this.prisma.user.findFirst({
@@ -50,15 +48,10 @@ export class UsersService {
 
         let avatarUrl: string | undefined;
         if (avatar) {
-            avatarUrl = await this.s3.uploadBuffer(
-                avatar.buffer,
-                avatar.mimetype,
-                `avatars`
-            );
-
+            avatarUrl = await this.s3.uploadBuffer(avatar.buffer, avatar.mimetype, `avatars`);
         }
 
-        const updatedUser = await this.prisma.user.update({
+        const user = await this.prisma.user.update({
             where: { id: userId },
             data: { ...dto, ...(avatarUrl ? { avatarUrl } : {}) },
             select: {
@@ -73,59 +66,47 @@ export class UsersService {
             },
         });
 
-        return { message: 'Profile updated successfully', user: updatedUser };
+        return { message: 'Profile updated successfully', user };
     }
 
     async follow(userId: number, targetId: number) {
-        if (userId === targetId) {
-            throw new BadRequestException('You cannot follow yourself');
-        }
+        if (userId === targetId) throw new BadRequestException('You cannot follow yourself');
 
-        try {
-            await this.prisma.$transaction(async (tx) => {
-                await tx.follower.create({
-                    data: { followerId: userId, followingId: targetId },
-                });
+        await this.prisma.$transaction(async (tx) => {
+            // создаст запись или бросит P2002 (уникальность)
+            await tx.follower.create({ data: { followerId: userId, followingId: targetId } });
 
-                await tx.user.update({
-                    where: { id: targetId },
-                    data: { followersCount: { increment: 1 } },
-                });
-                await tx.user.update({
-                    where: { id: userId },
-                    data: { followingCount: { increment: 1 } },
-                });
+            await tx.user.update({
+                where: { id: targetId },
+                data: { followersCount: { increment: 1 } },
             });
-        } catch (e: any) {
-            if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-                throw new BadRequestException('Already following this user');
-            }
+            await tx.user.update({
+                where: { id: userId },
+                data: { followingCount: { increment: 1 } },
+            });
+        }).catch((e: any) => {
+            if (e?.code === 'P2002') throw new BadRequestException('Already following this user');
             throw e;
-        }
+        });
 
         return { message: 'Successfully followed the user' };
     }
 
     async unfollow(userId: number, targetId: number) {
-        if (userId === targetId) {
-            throw new BadRequestException('You cannot unfollow yourself');
-        }
+        if (userId === targetId) throw new BadRequestException('You cannot unfollow yourself');
 
         await this.prisma.$transaction(async (tx) => {
-            const res = await tx.follower.deleteMany({
+            const del = await tx.follower.deleteMany({
                 where: { followerId: userId, followingId: targetId },
             });
+            if (del.count === 0) throw new BadRequestException('You are not following this user');
 
-            if (res.count === 0) {
-                throw new BadRequestException('You are not following this user');
-            }
-
-            await tx.user.update({
-                where: { id: targetId },
+            await tx.user.updateMany({
+                where: { id: targetId, followersCount: { gt: 0 } },
                 data: { followersCount: { decrement: 1 } },
             });
-            await tx.user.update({
-                where: { id: userId },
+            await tx.user.updateMany({
+                where: { id: userId, followingCount: { gt: 0 } },
                 data: { followingCount: { decrement: 1 } },
             });
         });
@@ -133,11 +114,7 @@ export class UsersService {
         return { message: 'Successfully unfollowed the user' };
     }
 
-    async getFollowers(
-        meId: number,
-        cursor?: number | null,
-        limit: number = 20,
-    ) {
+    async getFollowers(meId: number, cursor?: number | null, limit: number = 20) {
         const cursorInput = cursor && Number.isFinite(cursor) ? { id: cursor } : undefined;
 
         const rows = await this.prisma.follower.findMany({
@@ -157,7 +134,7 @@ export class UsersService {
         const slice = rows.slice(0, limit);
 
         return {
-            items: slice.map(r => ({
+            items: slice.map((r) => ({
                 relId: r.id,
                 followedAt: r.createdAt,
                 user: r.follower,
@@ -166,11 +143,7 @@ export class UsersService {
         };
     }
 
-    async getFollowing(
-        meId: number,
-        cursor?: number | null,
-        limit: number = 20,
-    ) {
+    async getFollowing(meId: number, cursor?: number | null, limit: number = 20) {
         const cursorInput = cursor && Number.isFinite(cursor) ? { id: cursor } : undefined;
 
         const rows = await this.prisma.follower.findMany({
@@ -190,7 +163,7 @@ export class UsersService {
         const slice = rows.slice(0, limit);
 
         return {
-            items: slice.map(r => ({
+            items: slice.map((r) => ({
                 relId: r.id,
                 followedAt: r.createdAt,
                 user: r.following,
@@ -202,7 +175,7 @@ export class UsersService {
     async getUserPublications(
         viewerId: number,
         targetId: number,
-        { isReels, cursor, limit },
+        { isReels, cursor, limit }: { isReels: boolean; cursor?: number; limit?: number }
     ) {
         const exists = await this.prisma.user.findUnique({
             where: { id: targetId },
@@ -218,11 +191,18 @@ export class UsersService {
             cursor: cursor ? { id: cursor } : undefined,
             skip: cursor ? 1 : 0,
             take,
-            include: {
-                images: { orderBy: { position: 'asc' } },
-                likes: { where: { userId: viewerId }, select: { id: true }, take: 1 },
-                savedBy: { where: { userId: viewerId }, select: { id: true }, take: 1 },
-
+            select: {
+                id: true,
+                caption: true,
+                isReels: true,
+                videoUrl: true,
+                thumbnail: true,
+                createdAt: true,
+                likesCount: true,
+                commentsCount: true,
+                savedCount: true,
+                shareCount: true,
+                images: { orderBy: { position: 'asc' }, select: { id: true, url: true, position: true, createdAt: true } },
                 user: {
                     select: {
                         id: true,
@@ -232,7 +212,8 @@ export class UsersService {
                         followers: { where: { followerId: viewerId }, select: { id: true }, take: 1 },
                     },
                 },
-                _count: { select: { likes: true, comments: true, savedBy: true } },
+                likes: { where: { userId: viewerId }, select: { id: true }, take: 1 },
+                savedBy: { where: { userId: viewerId }, select: { id: true }, take: 1 },
             },
         });
 
@@ -251,10 +232,10 @@ export class UsersService {
             },
             images: p.images,
             counts: {
-                likes: p._count.likes,
-                comments: p._count.comments,
-                saved: p._count.savedBy,
-                shared: p.shareCount
+                likes: p.likesCount,
+                comments: p.commentsCount,
+                saved: p.savedCount,
+                shared: p.shareCount,
             },
             liked: p.likes.length > 0,
             saved: p.savedBy.length > 0,
@@ -269,7 +250,7 @@ export class UsersService {
 
     async getFollowedPublications(
         viewerId: number,
-        { cursor, limit },
+        { cursor, limit }: { cursor?: number; limit?: number }
     ) {
         const take = Math.min(Math.max(limit || 20, 1), 100);
 
@@ -292,17 +273,29 @@ export class UsersService {
             cursor: cursor ? { id: cursor } : undefined,
             skip: cursor ? 1 : 0,
             take,
-            include: {
-                images: { orderBy: { position: 'asc' } },
-                likes: { where: { userId: viewerId }, select: { id: true }, take: 1 },
-                savedBy: { where: { userId: viewerId }, select: { id: true }, take: 1 },
+            select: {
+                id: true,
+                caption: true,
+                isReels: true,
+                videoUrl: true,
+                thumbnail: true,
+                createdAt: true,
+                likesCount: true,
+                commentsCount: true,
+                savedCount: true,
+                shareCount: true,
+                images: { orderBy: { position: 'asc' }, select: { id: true, url: true, position: true, createdAt: true } },
                 user: {
                     select: {
-                        id: true, username: true, fullName: true, avatarUrl: true,
+                        id: true,
+                        username: true,
+                        fullName: true,
+                        avatarUrl: true,
                         followers: { where: { followerId: viewerId }, select: { id: true }, take: 1 },
                     },
                 },
-                _count: { select: { likes: true, comments: true, savedBy: true } },
+                likes: { where: { userId: viewerId }, select: { id: true }, take: 1 },
+                savedBy: { where: { userId: viewerId }, select: { id: true }, take: 1 },
             },
         });
 
@@ -321,10 +314,10 @@ export class UsersService {
             },
             images: p.images,
             counts: {
-                likes: p._count.likes,
-                comments: p._count.comments,
-                saved: p._count.savedBy,
-                shared: p.shareCount
+                likes: p.likesCount,
+                comments: p.commentsCount,
+                saved: p.savedCount,
+                shared: p.shareCount,
             },
             liked: p.likes.length > 0,
             saved: p.savedBy.length > 0,
@@ -365,7 +358,7 @@ export class UsersService {
             select: { id: true, username: true, fullName: true, avatarUrl: true, bio: true },
         });
 
-        const items = users.map(u => ({
+        const items = users.map((u) => ({
             id: u.id,
             username: u.username,
             fullName: u.fullName,
@@ -387,17 +380,10 @@ export class UsersService {
                 fullName: true,
                 avatarUrl: true,
                 bio: true,
-                _count: { select: { followers: true, following: true } },
-                followers: {
-                    where: { followerId: viewerId },
-                    select: { id: true },
-                    take: 1,
-                },
-                following: {
-                    where: { followingId: viewerId },
-                    select: { id: true },
-                    take: 1,
-                },
+                followersCount: true,
+                followingCount: true,
+                followers: { where: { followerId: viewerId }, select: { id: true }, take: 1 },
+                following: { where: { followingId: viewerId }, select: { id: true }, take: 1 },
             },
         });
 
@@ -413,8 +399,8 @@ export class UsersService {
             avatarUrl: user.avatarUrl,
             bio: user.bio,
             counts: {
-                followers: user._count.followers,
-                following: user._count.following,
+                followers: user.followersCount,
+                following: user.followingCount,
             },
             viewer: {
                 isFollowing: isFollowedByViewer,
@@ -423,12 +409,7 @@ export class UsersService {
         };
     }
 
-    async getFollowersOfUser(
-        viewerId: number,
-        userId: number,
-        cursor?: number,
-        limit: number = 20,
-    ) {
+    async getFollowersOfUser(viewerId: number, userId: number, cursor?: number, limit: number = 20) {
         const exists = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
         if (!exists) throw new NotFoundException('User not found');
 
@@ -447,17 +428,10 @@ export class UsersService {
                         username: true,
                         fullName: true,
                         avatarUrl: true,
-                        _count: { select: { followers: true, following: true } },
-                        followers: {
-                            where: { followerId: viewerId },
-                            select: { id: true },
-                            take: 1,
-                        },
-                        following: {
-                            where: { followingId: viewerId },
-                            select: { id: true },
-                            take: 1,
-                        },
+                        followersCount: true,
+                        followingCount: true,
+                        followers: { where: { followerId: viewerId }, select: { id: true }, take: 1 },
+                        following: { where: { followingId: viewerId }, select: { id: true }, take: 1 },
                     },
                 },
             },
@@ -469,8 +443,8 @@ export class UsersService {
             fullName: follower.fullName,
             avatarUrl: follower.avatarUrl,
             counts: {
-                followers: follower._count.followers,
-                following: follower._count.following,
+                followers: follower.followersCount,
+                following: follower.followingCount,
             },
             viewer: {
                 isFollowing: follower.followers.length > 0,
@@ -480,16 +454,10 @@ export class UsersService {
         }));
 
         const nextCursor = rows.length === take ? rows[rows.length - 1].id : null;
-
         return { items, nextCursor };
     }
 
-    async getFollowingOfUser(
-        viewerId: number,
-        userId: number,
-        cursor?: number,
-        limit: number = 20,
-    ) {
+    async getFollowingOfUser(viewerId: number, userId: number, cursor?: number, limit: number = 20) {
         const exists = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
         if (!exists) throw new NotFoundException('User not found');
 
@@ -508,17 +476,10 @@ export class UsersService {
                         username: true,
                         fullName: true,
                         avatarUrl: true,
-                        _count: { select: { followers: true, following: true } },
-                        followers: {
-                            where: { followerId: viewerId },
-                            select: { id: true },
-                            take: 1,
-                        },
-                        following: {
-                            where: { followingId: viewerId },
-                            select: { id: true },
-                            take: 1,
-                        },
+                        followersCount: true,
+                        followingCount: true,
+                        followers: { where: { followerId: viewerId }, select: { id: true }, take: 1 },
+                        following: { where: { followingId: viewerId }, select: { id: true }, take: 1 },
                     },
                 },
             },
@@ -530,8 +491,8 @@ export class UsersService {
             fullName: following.fullName,
             avatarUrl: following.avatarUrl,
             counts: {
-                followers: following._count.followers,
-                following: following._count.following,
+                followers: following.followersCount,
+                following: following.followingCount,
             },
             viewer: {
                 isFollowing: following.followers.length > 0,
@@ -541,7 +502,6 @@ export class UsersService {
         }));
 
         const nextCursor = rows.length === take ? rows[rows.length - 1].id : null;
-
         return { items, nextCursor };
     }
 }

@@ -145,6 +145,22 @@ export class PostsController {
         return this.postsService.getCommentReplies(request.userId, commentId, { cursor, limit });
     }
 
+    @Post('comments/:commentId/like')
+    async likeComment(
+        @Req() request: RequestWithAuth,
+        @Param('commentId') commentId: number
+    ) {
+        return this.postsService.likeComment(request.userId, Number(commentId));
+    }
+
+    @Delete('comments/:commentId/like')
+    async unlikeComment(
+        @Req() request: RequestWithAuth,
+        @Param('commentId') commentId: number
+    ) {
+        return this.postsService.unlikeComment(request.userId, Number(commentId));
+    }
+
     // ---------- LIKES ----------
     @Post(':id/like')
     async like(@Req() request: RequestWithAuth, @Param('id') id: number) {

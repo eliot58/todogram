@@ -72,6 +72,9 @@ model Post {
   savedBy     SavedPost[]
 
   shareCount  Int         @default(0)
+  likesCount     Int        @default(0)
+  commentsCount  Int        @default(0)
+  savedCount     Int        @default(0)
 
   @@index([isReels, id])
   @@index([userId, createdAt])
@@ -163,6 +166,8 @@ model Comment {
   replies     Comment[] @relation("CommentReplies")
 
   likes       CommentLike[]
+
+  likesCount  Int      @default(0)
 
   @@index([postId, parentId, id])
   @@index([parentId, id])

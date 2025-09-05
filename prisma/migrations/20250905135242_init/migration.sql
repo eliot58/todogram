@@ -38,6 +38,9 @@ CREATE TABLE "public"."Post" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "userId" INTEGER NOT NULL,
     "shareCount" INTEGER NOT NULL DEFAULT 0,
+    "likesCount" INTEGER NOT NULL DEFAULT 0,
+    "commentsCount" INTEGER NOT NULL DEFAULT 0,
+    "savedCount" INTEGER NOT NULL DEFAULT 0,
 
     CONSTRAINT "Post_pkey" PRIMARY KEY ("id")
 );
@@ -103,6 +106,7 @@ CREATE TABLE "public"."Comment" (
     "userId" INTEGER NOT NULL,
     "postId" INTEGER,
     "parentId" INTEGER,
+    "likesCount" INTEGER NOT NULL DEFAULT 0,
 
     CONSTRAINT "Comment_pkey" PRIMARY KEY ("id")
 );

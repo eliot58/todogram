@@ -15,44 +15,25 @@ export class PostsService {
         files: { images: ImageFile[]; video: VideoFile | null; thumbnail: ImageFile | null }
     ) {
         if (input.isReels) {
-            if (!files.video) {
-                throw new BadRequestException('video is required for reels');
-            }
-            if (files.images.length > 0) {
-                throw new BadRequestException('images are not allowed for reels');
-            }
-            if (!isVideo(files.video.mimetype)) {
-                throw new BadRequestException('Invalid video mime type');
-            }
+            if (!files.video) throw new BadRequestException('video is required for reels');
+            if (files.images.length > 0) throw new BadRequestException('images are not allowed for reels');
+            if (!isVideo(files.video.mimetype)) throw new BadRequestException('Invalid video mime type');
 
-            if (!files.thumbnail) {
-                throw new BadRequestException('thumbnail is required for reels');
-            }
-            if (!isImage(files.thumbnail.mimetype)) {
-                throw new BadRequestException(`Invalid thumbnail mime type: ${files.thumbnail.mimetype}`);
-            }
+            if (!files.thumbnail) throw new BadRequestException('thumbnail is required for reels');
+            if (!isImage(files.thumbnail.mimetype)) throw new BadRequestException(`Invalid thumbnail mime type: ${files.thumbnail.mimetype}`);
         } else {
-            if (files.images.length === 0) {
-                throw new BadRequestException('At least one image is required');
-            }
-            if (files.video) {
-                throw new BadRequestException('video is not allowed for non-reels post');
-            }
-            if (files.thumbnail) {
-                throw new BadRequestException('thumbnail is not allowed for non-reels post');
-            }
+            if (files.images.length === 0) throw new BadRequestException('At least one image is required');
+            if (files.video) throw new BadRequestException('video is not allowed for non-reels post');
+            if (files.thumbnail) throw new BadRequestException('thumbnail is not allowed for non-reels post');
             for (const img of files.images) {
-                if (!isImage(img.mimetype)) {
-                    throw new BadRequestException(`Invalid image mime type: ${img.mimetype}`);
-                }
+                if (!isImage(img.mimetype)) throw new BadRequestException(`Invalid image mime type: ${img.mimetype}`);
             }
         }
     }
 
-
     async create(
         data: { caption?: string; isReels: boolean; userId: number },
-        files: { images: ImageFile[]; video: VideoFile | null, thumbnail: ImageFile | null }
+        files: { images: ImageFile[]; video: VideoFile | null; thumbnail: ImageFile | null }
     ) {
         this.assertPayload(data, files);
 
@@ -60,33 +41,28 @@ export class PostsService {
             const videoUrl = await this.s3.uploadBuffer(files.video!.buffer, files.video!.mimetype, 'posts/videos');
             const thumbnailUrl = await this.s3.uploadBuffer(files.thumbnail!.buffer, files.thumbnail!.mimetype, 'posts/thumbnail');
 
-            try {
-                const post = await this.prisma.$transaction(async (tx) => {
-                    const created = await tx.post.create({
-                        data: {
-                            caption: data.caption,
-                            isReels: true,
-                            videoUrl,
-                            userId: data.userId,
-                            thumbnail: thumbnailUrl
-                        },
-                        include: {
-                            images: true,
-                            user: { select: { id: true, username: true, avatarUrl: true } },
-                            _count: { select: { likes: true, comments: true, savedBy: true } },
-                        },
-                    });
-
-                    await tx.user.update({
-                        where: { id: data.userId },
-                        data: { postCount: { increment: 1 } },
-                    });
-
-                    return created;
+            return this.prisma.$transaction(async (tx) => {
+                const created = await tx.post.create({
+                    data: {
+                        caption: data.caption,
+                        isReels: true,
+                        videoUrl,
+                        userId: data.userId,
+                        thumbnail: thumbnailUrl,
+                    },
+                    include: {
+                        images: true,
+                        user: { select: { id: true, username: true, avatarUrl: true } },
+                    },
                 });
 
-                return post;
-            } catch (e) { }
+                await tx.user.update({
+                    where: { id: data.userId },
+                    data: { postCount: { increment: 1 } },
+                });
+
+                return created;
+            });
         } else {
             const uploaded = await Promise.all(
                 files.images.map((img, idx) =>
@@ -94,32 +70,27 @@ export class PostsService {
                 )
             );
 
-            try {
-                const post = await this.prisma.$transaction(async (tx) => {
-                    const created = await tx.post.create({
-                        data: {
-                            caption: data.caption,
-                            isReels: false,
-                            userId: data.userId,
-                            images: { create: uploaded.map((u) => ({ url: u.url, position: u.position })) },
-                        },
-                        include: {
-                            images: { orderBy: { position: 'asc' } },
-                            user: { select: { id: true, username: true, avatarUrl: true } },
-                            _count: { select: { likes: true, comments: true, savedBy: true } },
-                        },
-                    });
-
-                    await tx.user.update({
-                        where: { id: data.userId },
-                        data: { postCount: { increment: 1 } },
-                    });
-
-                    return created;
+            return this.prisma.$transaction(async (tx) => {
+                const created = await tx.post.create({
+                    data: {
+                        caption: data.caption,
+                        isReels: false,
+                        userId: data.userId,
+                        images: { create: uploaded.map((u) => ({ url: u.url, position: u.position })) },
+                    },
+                    include: {
+                        images: { orderBy: { position: 'asc' } },
+                        user: { select: { id: true, username: true, avatarUrl: true } },
+                    },
                 });
 
-                return post;
-            } catch (e) { }
+                await tx.user.update({
+                    where: { id: data.userId },
+                    data: { postCount: { increment: 1 } },
+                });
+
+                return created;
+            });
         }
     }
 
@@ -138,22 +109,14 @@ export class PostsService {
         if (post.userId !== userId) throw new ForbiddenException('You are not allowed to delete this post');
 
         await this.prisma.$transaction(async (tx) => {
-
             await tx.post.delete({ where: { id } });
-
-            await tx.user.update({
-                where: { id: userId },
-                data: { postCount: { decrement: 1 } },
-            });
+            await tx.user.update({ where: { id: userId }, data: { postCount: { decrement: 1 } } });
         });
 
         return { message: 'Deleted' };
     }
 
-    async getAllPosts(
-        viewerId: number,
-        { cursor, limit },
-    ) {
+    async getAllPosts(viewerId: number, { cursor, limit }: { cursor?: number; limit?: number }) {
         const take = Math.min(Math.max(limit || 20, 1), 100);
 
         const posts = await this.prisma.post.findMany({
@@ -161,10 +124,18 @@ export class PostsService {
             cursor: cursor ? { id: cursor } : undefined,
             skip: cursor ? 1 : 0,
             take,
-            include: {
-                images: { orderBy: { position: 'asc' } },
-                likes: { where: { userId: viewerId }, select: { id: true }, take: 1 },
-                savedBy: { where: { userId: viewerId }, select: { id: true }, take: 1 },
+            select: {
+                id: true,
+                caption: true,
+                isReels: true,
+                videoUrl: true,
+                thumbnail: true,
+                createdAt: true,
+                likesCount: true,
+                commentsCount: true,
+                savedCount: true,
+                shareCount: true,
+                images: { orderBy: { position: 'asc' }, select: { id: true, url: true, position: true, createdAt: true } },
                 user: {
                     select: {
                         id: true,
@@ -174,7 +145,8 @@ export class PostsService {
                         followers: { where: { followerId: viewerId }, select: { id: true }, take: 1 },
                     },
                 },
-                _count: { select: { likes: true, comments: true, savedBy: true } },
+                likes: { where: { userId: viewerId }, select: { id: true }, take: 1 },
+                savedBy: { where: { userId: viewerId }, select: { id: true }, take: 1 },
             },
         });
 
@@ -193,10 +165,10 @@ export class PostsService {
             },
             images: p.images,
             counts: {
-                likes: p._count.likes,
-                comments: p._count.comments,
-                saved: p._count.savedBy,
-                shared: p.shareCount
+                likes: p.likesCount,
+                comments: p.commentsCount,
+                saved: p.savedCount,
+                shared: p.shareCount,
             },
             liked: p.likes.length > 0,
             saved: p.savedBy.length > 0,
@@ -209,10 +181,7 @@ export class PostsService {
         return { items, nextCursor };
     }
 
-    async getAllReels(
-        viewerId: number,
-        { cursor, limit },
-    ) {
+    async getAllReels(viewerId: number, { cursor, limit }: { cursor?: number; limit?: number }) {
         const take = Math.min(Math.max(limit || 20, 1), 100);
 
         const posts = await this.prisma.post.findMany({
@@ -221,17 +190,29 @@ export class PostsService {
             cursor: cursor ? { id: cursor } : undefined,
             skip: cursor ? 1 : 0,
             take,
-            include: {
-                images: { orderBy: { position: 'asc' } },
-                likes: { where: { userId: viewerId }, select: { id: true }, take: 1 },
-                savedBy: { where: { userId: viewerId }, select: { id: true }, take: 1 },
+            select: {
+                id: true,
+                caption: true,
+                isReels: true,
+                videoUrl: true,
+                thumbnail: true,
+                createdAt: true,
+                likesCount: true,
+                commentsCount: true,
+                savedCount: true,
+                shareCount: true,
+                images: { orderBy: { position: 'asc' }, select: { id: true, url: true, position: true, createdAt: true } },
                 user: {
                     select: {
-                        id: true, username: true, fullName: true, avatarUrl: true,
+                        id: true,
+                        username: true,
+                        fullName: true,
+                        avatarUrl: true,
                         followers: { where: { followerId: viewerId }, select: { id: true }, take: 1 },
                     },
                 },
-                _count: { select: { likes: true, comments: true, savedBy: true } },
+                likes: { where: { userId: viewerId }, select: { id: true }, take: 1 },
+                savedBy: { where: { userId: viewerId }, select: { id: true }, take: 1 },
             },
         });
 
@@ -244,7 +225,7 @@ export class PostsService {
             createdAt: p.createdAt,
             user: { id: p.user.id, username: p.user.username, fullName: p.user.fullName, avatarUrl: p.user.avatarUrl },
             images: p.images,
-            counts: { likes: p._count.likes, comments: p._count.comments, saved: p._count.savedBy, shared: p.shareCount },
+            counts: { likes: p.likesCount, comments: p.commentsCount, saved: p.savedCount, shared: p.shareCount },
             liked: p.likes.length > 0,
             saved: p.savedBy.length > 0,
             followsAuthor: p.user.followers.length > 0,
@@ -262,34 +243,56 @@ export class PostsService {
         if (!text) throw new BadRequestException('Content is required');
         if (text.length > 1000) throw new BadRequestException('Content is too long (max 1000)');
 
-        const post = await this.prisma.post.findUnique({
-            where: { id: postId },
-            select: { id: true },
-        });
-        if (!post) throw new NotFoundException('Post not found');
+        return this.prisma.$transaction(async (tx) => {
+            await tx.post.findUniqueOrThrow({ where: { id: postId }, select: { id: true } });
 
-        const comment = await this.prisma.comment.create({
-            data: {
-                content: text,
-                userId,
-                postId,
-                parentId: null
-            },
-            include: {
-                user: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
-                _count: { select: { likes: true, replies: true } },
-            },
-        });
+            const comment = await tx.comment.create({
+                data: { content: text, userId, postId, parentId: null },
+                select: {
+                    id: true,
+                    content: true,
+                    createdAt: true,
+                    user: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
+                },
+            });
 
-        return comment;
+            await tx.post.update({ where: { id: postId }, data: { commentsCount: { increment: 1 } } });
+
+            return { ...comment, counts: { likes: 0, replies: 0 }, liked: false };
+        });
     }
 
-    async getPostComments(viewerId: number, postId: number, { cursor, limit }) {
-        const post = await this.prisma.post.findUnique({
-            where: { id: postId },
-            select: { id: true },
+    async addReply(userId: number, parentCommentId: number, content: string) {
+        const text = (content ?? '').trim();
+        if (!text) throw new BadRequestException('Content is required');
+        if (text.length > 1000) throw new BadRequestException('Content is too long (max 1000)');
+
+        return this.prisma.$transaction(async (tx) => {
+            const parent = await tx.comment.findUnique({
+                where: { id: parentCommentId },
+                select: { id: true, postId: true },
+            });
+            if (!parent) throw new NotFoundException('Parent comment not found');
+            if (!parent.postId) throw new BadRequestException('Parent comment has no post');
+
+            const reply = await tx.comment.create({
+                data: { content: text, userId, postId: parent.postId, parentId: parent.id },
+                select: {
+                    id: true,
+                    content: true,
+                    createdAt: true,
+                    user: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
+                },
+            });
+
+            await tx.post.update({ where: { id: parent.postId }, data: { commentsCount: { increment: 1 } } });
+
+            return { ...reply, counts: { likes: 0, replies: 0 }, liked: false };
         });
-        if (!post) throw new NotFoundException('Post not found');
+    }
+
+    async getPostComments(viewerId: number, postId: number, { cursor, limit }: { cursor?: number; limit?: number }) {
+        await this.prisma.post.findUniqueOrThrow({ where: { id: postId }, select: { id: true } });
 
         const take = Math.min(Math.max(limit || 20, 1), 100);
 
@@ -299,10 +302,12 @@ export class PostsService {
             cursor: cursor ? { id: cursor } : undefined,
             skip: cursor ? 1 : 0,
             take,
-            include: {
+            select: {
+                id: true,
+                content: true,
+                createdAt: true,
                 user: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
                 likes: { where: { userId: viewerId }, select: { id: true }, take: 1 },
-                _count: { select: { likes: true, replies: true } },
             },
         });
 
@@ -311,10 +316,7 @@ export class PostsService {
             content: c.content,
             createdAt: c.createdAt,
             user: c.user,
-            counts: {
-                likes: c._count.likes,
-                replies: c._count.replies,
-            },
+            counts: { likes: 0, replies: 0 }, // если нужно, можно денормализовать и тут
             liked: c.likes.length > 0,
         }));
 
@@ -324,12 +326,8 @@ export class PostsService {
         return { items, nextCursor };
     }
 
-    async getCommentReplies(viewerId: number, commentId: number, { cursor, limit }) {
-        const parent = await this.prisma.comment.findUnique({
-            where: { id: commentId },
-            select: { id: true },
-        });
-        if (!parent) throw new NotFoundException('Comment not found');
+    async getCommentReplies(viewerId: number, commentId: number, { cursor, limit }: { cursor?: number; limit?: number }) {
+        await this.prisma.comment.findUniqueOrThrow({ where: { id: commentId }, select: { id: true } });
 
         const take = Math.min(Math.max(limit || 20, 1), 100);
 
@@ -339,10 +337,12 @@ export class PostsService {
             cursor: cursor ? { id: cursor } : undefined,
             skip: cursor ? 1 : 0,
             take,
-            include: {
+            select: {
+                id: true,
+                content: true,
+                createdAt: true,
                 user: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
                 likes: { where: { userId: viewerId }, select: { id: true }, take: 1 },
-                _count: { select: { likes: true, replies: true } },
             },
         });
 
@@ -351,10 +351,7 @@ export class PostsService {
             content: r.content,
             createdAt: r.createdAt,
             user: r.user,
-            counts: {
-                likes: r._count.likes,
-                replies: r._count.replies,
-            },
+            counts: { likes: 0, replies: 0 },
             liked: r.likes.length > 0,
         }));
 
@@ -364,57 +361,116 @@ export class PostsService {
         return { items, nextCursor };
     }
 
-    // ===== LIKES =====
-    async likePost(userId: number, postId: number) {
-        const post = await this.prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
-        if (!post) throw new NotFoundException('Post not found');
+    // ===== COMMENT LIKES =====
+    async likeComment(userId: number, commentId: number) {
+        return this.prisma.$transaction(async (tx) => {
+            await tx.comment.findUniqueOrThrow({ where: { id: commentId }, select: { id: true } });
 
-        await this.prisma.like.upsert({
-            where: { userId_postId: { userId, postId } },
-            create: { userId, postId },
-            update: {},
+            try {
+                await tx.commentLike.create({ data: { userId, commentId } });
+                const { likesCount } = await tx.comment.update({
+                    where: { id: commentId },
+                    data: { likesCount: { increment: 1 } },
+                    select: { likesCount: true },
+                });
+                return { ok: true, liked: true, likesCount };
+            } catch (e: any) {
+                if (e?.code !== 'P2002') throw e;
+                const { likesCount } = await tx.comment.findUniqueOrThrow({ where: { id: commentId }, select: { likesCount: true } });
+                return { ok: true, liked: true, likesCount };
+            }
         });
+    }
 
-        const likesCount = await this.prisma.like.count({ where: { postId } });
-        return { liked: true, likesCount };
+    async unlikeComment(userId: number, commentId: number) {
+        return this.prisma.$transaction(async (tx) => {
+            await tx.comment.findUniqueOrThrow({ where: { id: commentId }, select: { id: true } });
+
+            const del = await tx.commentLike.deleteMany({ where: { userId, commentId } });
+            if (del.count > 0) {
+                await tx.comment.updateMany({
+                    where: { id: commentId, likesCount: { gt: 0 } },
+                    data: { likesCount: { decrement: 1 } },
+                });
+            }
+
+            const { likesCount } = await tx.comment.findUniqueOrThrow({ where: { id: commentId }, select: { likesCount: true } });
+            return { ok: true, liked: false, likesCount };
+        });
+    }
+
+    // ===== POST LIKES =====
+    async likePost(userId: number, postId: number) {
+        return this.prisma.$transaction(async (tx) => {
+            await tx.post.findUniqueOrThrow({ where: { id: postId }, select: { id: true } });
+
+            try {
+                await tx.like.create({ data: { userId, postId } });
+                const { likesCount } = await tx.post.update({
+                    where: { id: postId },
+                    data: { likesCount: { increment: 1 } },
+                    select: { likesCount: true },
+                });
+                return { liked: true, likesCount };
+            } catch (e: any) {
+                if (e?.code !== 'P2002') throw e; // уже лайкнуто
+                const { likesCount } = await tx.post.findUniqueOrThrow({ where: { id: postId }, select: { likesCount: true } });
+                return { liked: true, likesCount };
+            }
+        });
     }
 
     async unlikePost(userId: number, postId: number) {
-        const post = await this.prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
-        if (!post) throw new NotFoundException('Post not found');
+        return this.prisma.$transaction(async (tx) => {
+            await tx.post.findUniqueOrThrow({ where: { id: postId }, select: { id: true } });
 
-        await this.prisma.like
-            .delete({ where: { userId_postId: { userId, postId } } })
-            .catch(() => void 0);
+            const del = await tx.like.deleteMany({ where: { userId, postId } });
+            if (del.count > 0) {
+                await tx.post.updateMany({
+                    where: { id: postId, likesCount: { gt: 0 } },
+                    data: { likesCount: { decrement: 1 } },
+                });
+            }
 
-        const likesCount = await this.prisma.like.count({ where: { postId } });
-        return { liked: false, likesCount };
+            const { likesCount } = await tx.post.findUniqueOrThrow({ where: { id: postId }, select: { likesCount: true } });
+            return { liked: false, likesCount };
+        });
     }
 
-    // ===== SAVES =====
     async savePost(userId: number, postId: number) {
-        const post = await this.prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
-        if (!post) throw new NotFoundException('Post not found');
+        return this.prisma.$transaction(async (tx) => {
+            await tx.post.findUniqueOrThrow({ where: { id: postId }, select: { id: true } });
 
-        await this.prisma.savedPost.upsert({
-            where: { userId_postId: { userId, postId } },
-            create: { userId, postId },
-            update: {},
+            try {
+                await tx.savedPost.create({ data: { userId, postId } });
+                const { savedCount } = await tx.post.update({
+                    where: { id: postId },
+                    data: { savedCount: { increment: 1 } },
+                    select: { savedCount: true },
+                });
+                return { saved: true, savedCount };
+            } catch (e: any) {
+                if (e?.code !== 'P2002') throw e;
+                const { savedCount } = await tx.post.findUniqueOrThrow({ where: { id: postId }, select: { savedCount: true } });
+                return { saved: true, savedCount };
+            }
         });
-
-        const savedCount = await this.prisma.savedPost.count({ where: { postId } });
-        return { saved: true, savedCount };
     }
 
     async unsavePost(userId: number, postId: number) {
-        const post = await this.prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
-        if (!post) throw new NotFoundException('Post not found');
+        return this.prisma.$transaction(async (tx) => {
+            await tx.post.findUniqueOrThrow({ where: { id: postId }, select: { id: true } });
 
-        await this.prisma.savedPost
-            .delete({ where: { userId_postId: { userId, postId } } })
-            .catch(() => void 0);
+            const del = await tx.savedPost.deleteMany({ where: { userId, postId } });
+            if (del.count > 0) {
+                await tx.post.updateMany({
+                    where: { id: postId, savedCount: { gt: 0 } },
+                    data: { savedCount: { decrement: 1 } },
+                });
+            }
 
-        const savedCount = await this.prisma.savedPost.count({ where: { postId } });
-        return { saved: false, savedCount };
+            const { savedCount } = await tx.post.findUniqueOrThrow({ where: { id: postId }, select: { savedCount: true } });
+            return { saved: false, savedCount };
+        });
     }
 }
