@@ -121,6 +121,25 @@ export class PostsController {
         return this.postsService.addComment(request.userId, id, body.content);
     }
 
+    @Post('comments/:commentId/replies')
+    @ApiConsumes('application/json')
+    @ApiBody({
+        schema: {
+            type: 'object',
+            required: ['content'],
+            properties: {
+                content: { type: 'string', minLength: 1, maxLength: 1000 }
+            },
+        },
+    })
+    async addReply(
+        @Req() request: RequestWithAuth,
+        @Param('commentId') commentId: number,
+        @Body() body: { content: string }
+    ) {
+        return this.postsService.addReply(request.userId, commentId, body.content);
+    }
+
     @Get(':id/comments')
     @ApiQuery({ name: 'cursor', required: false, type: Number })
     @ApiQuery({ name: 'limit', required: false, type: Number })
