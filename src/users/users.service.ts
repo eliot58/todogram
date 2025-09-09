@@ -504,4 +504,13 @@ export class UsersService {
         const nextCursor = rows.length === take ? rows[rows.length - 1].id : null;
         return { items, nextCursor };
     }
+
+    async isUsernameAvailable(username: string): Promise<boolean> {
+        const existing = await this.prisma.user.findFirst({
+            where: { username: { equals: username, mode: 'insensitive' } },
+            select: { id: true },
+        });
+        return !existing;
+    }
+
 }
