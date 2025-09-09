@@ -110,6 +110,36 @@ export class UsersController {
         return this.usersService.getFollowing(request.userId, cursor, limit);
     }
 
+    @Get('me/posts')
+    @ApiQuery({ name: 'cursor', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    async getMyPosts(
+        @Req() request: RequestWithAuth,
+        @Query('cursor') cursor?: number,
+        @Query('limit') limit: number = 20,
+    ) {
+        return this.usersService.getUserPublications(request.userId, request.userId, {
+            isReels: false,
+            cursor,
+            limit,
+        });
+    }
+
+    @Get('me/reels')
+    @ApiQuery({ name: 'cursor', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    async getMyReels(
+        @Req() request: RequestWithAuth,
+        @Query('cursor') cursor?: number,
+        @Query('limit') limit: number = 20,
+    ) {
+        return this.usersService.getUserPublications(request.userId, request.userId, {
+            isReels: true,
+            cursor,
+            limit,
+        });
+    }
+
     @Get(':id/posts')
     @ApiQuery({ name: 'cursor', required: false, type: Number })
     @ApiQuery({ name: 'limit', required: false, type: Number })
