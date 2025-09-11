@@ -13,6 +13,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { RedisModule } from './redis/redis.module';
 import { S3Module } from './s3/s3.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { S3Module } from './s3/s3.module';
     PrismaModule,
     RedisModule,
     S3Module,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [

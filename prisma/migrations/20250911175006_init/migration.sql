@@ -9,6 +9,7 @@ CREATE TABLE "public"."User" (
     "bio" TEXT,
     "avatarUrl" TEXT,
     "isVerify" BOOLEAN NOT NULL DEFAULT false,
+    "isPrivate" BOOLEAN NOT NULL DEFAULT false,
     "verifiedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "followersCount" INTEGER NOT NULL DEFAULT 0,
@@ -26,6 +27,16 @@ CREATE TABLE "public"."Follower" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Follower_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."CloseFriend" (
+    "id" SERIAL NOT NULL,
+    "ownerId" INTEGER NOT NULL,
+    "friendId" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "CloseFriend_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -137,6 +148,15 @@ CREATE INDEX "Follower_followingId_createdAt_idx" ON "public"."Follower"("follow
 CREATE UNIQUE INDEX "Follower_followerId_followingId_key" ON "public"."Follower"("followerId", "followingId");
 
 -- CreateIndex
+CREATE INDEX "CloseFriend_ownerId_createdAt_idx" ON "public"."CloseFriend"("ownerId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "CloseFriend_friendId_createdAt_idx" ON "public"."CloseFriend"("friendId", "createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "CloseFriend_ownerId_friendId_key" ON "public"."CloseFriend"("ownerId", "friendId");
+
+-- CreateIndex
 CREATE INDEX "Post_isReels_id_idx" ON "public"."Post"("isReels", "id");
 
 -- CreateIndex
@@ -198,6 +218,12 @@ ALTER TABLE "public"."Follower" ADD CONSTRAINT "Follower_followerId_fkey" FOREIG
 
 -- AddForeignKey
 ALTER TABLE "public"."Follower" ADD CONSTRAINT "Follower_followingId_fkey" FOREIGN KEY ("followingId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."CloseFriend" ADD CONSTRAINT "CloseFriend_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."CloseFriend" ADD CONSTRAINT "CloseFriend_friendId_fkey" FOREIGN KEY ("friendId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."Post" ADD CONSTRAINT "Post_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

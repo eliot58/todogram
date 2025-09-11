@@ -24,6 +24,7 @@ model User {
   bio            String?
   avatarUrl      String?
   isVerify       Boolean   @default(false)
+  isPrivate      Boolean   @default(false)
   verifiedAt     DateTime?
   createdAt      DateTime  @default(now())
 
@@ -40,6 +41,9 @@ model User {
   storyViews     StoryView[]
   savedPosts     SavedPost[]
   commentLikes   CommentLike[]
+
+  closeFriends     CloseFriend[] @relation("UserCloseFriendsOwner")
+  inCloseFriendsOf CloseFriend[] @relation("UserCloseFriendsMember")
 }
 
 model Follower {
@@ -53,6 +57,19 @@ model Follower {
   @@unique([followerId, followingId])
   @@index([followerId, createdAt])
   @@index([followingId, createdAt])
+}
+
+model CloseFriend {
+  id         Int      @id @default(autoincrement())
+  owner      User     @relation("UserCloseFriendsOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId    Int
+  friend     User     @relation("UserCloseFriendsMember", fields: [friendId], references: [id], onDelete: Cascade)
+  friendId   Int
+  createdAt  DateTime @default(now())
+
+  @@unique([ownerId, friendId])
+  @@index([ownerId, createdAt])
+  @@index([friendId, createdAt])
 }
 
 model Post {
