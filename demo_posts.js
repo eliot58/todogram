@@ -152,7 +152,7 @@ async function importItems() {
         totalCreated++;
       }
 
-      console.log(`Создано для ${u.email}: +${needImages} обычных, +${needReels} рилсов`);
+      console.log(`Создано для ${dbUser.email}: +${needImages} обычных, +${needReels} рилсов`);
     }
 
     console.log(`Готово! Всего создано постов: ${totalCreated}`);
