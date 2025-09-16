@@ -382,6 +382,7 @@ export class UsersService {
                 bio: true,
                 followersCount: true,
                 followingCount: true,
+                postCount: true,
                 followers: { where: { followerId: viewerId }, select: { id: true }, take: 1 },
                 following: { where: { followingId: viewerId }, select: { id: true }, take: 1 },
             },
@@ -401,6 +402,7 @@ export class UsersService {
             counts: {
                 followers: user.followersCount,
                 following: user.followingCount,
+                posts: user.postCount
             },
             viewer: {
                 isFollowing: isFollowedByViewer,
@@ -559,36 +561,36 @@ export class UsersService {
 
     async getMyCloseFriends(viewerId: number, cursor?: number, limit: number = 20) {
         const take = Math.min(Math.max(limit || 20, 1), 100);
-      
+
         const rows = await this.prisma.closeFriend.findMany({
-          where: { ownerId: viewerId },
-          orderBy: { id: 'desc' },
-          cursor: cursor ? { id: cursor } : undefined,
-          skip: cursor ? 1 : 0,
-          take,
-          include: {
-            friend: {
-              select: {
-                id: true,
-                username: true,
-                fullName: true,
-                avatarUrl: true,
-              },
+            where: { ownerId: viewerId },
+            orderBy: { id: 'desc' },
+            cursor: cursor ? { id: cursor } : undefined,
+            skip: cursor ? 1 : 0,
+            take,
+            include: {
+                friend: {
+                    select: {
+                        id: true,
+                        username: true,
+                        fullName: true,
+                        avatarUrl: true,
+                    },
+                },
             },
-          },
         });
-      
+
         const items = rows.map(({ friend }) => ({
-          id: friend.id,
-          username: friend.username,
-          fullName: friend.fullName,
-          avatarUrl: friend.avatarUrl,
+            id: friend.id,
+            username: friend.username,
+            fullName: friend.fullName,
+            avatarUrl: friend.avatarUrl,
         }));
-      
+
         const nextCursor = rows.length === take ? rows[rows.length - 1].id : null;
-      
+
         return { items, nextCursor };
-      }
-      
+    }
+
 
 }
