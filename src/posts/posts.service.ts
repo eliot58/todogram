@@ -120,6 +120,9 @@ export class PostsService {
         const take = Math.min(Math.max(limit || 20, 1), 100);
 
         const posts = await this.prisma.post.findMany({
+            where: {
+                user: { isPrivate: false },
+            },
             orderBy: { id: 'desc' },
             cursor: cursor ? { id: cursor } : undefined,
             skip: cursor ? 1 : 0,
@@ -185,7 +188,12 @@ export class PostsService {
         const take = Math.min(Math.max(limit || 20, 1), 100);
 
         const posts = await this.prisma.post.findMany({
-            where: { isReels: true },
+            where: { 
+                isReels: true,
+                user: {
+                    isPrivate: false
+                }
+            },
             orderBy: { id: 'desc' },
             cursor: cursor ? { id: cursor } : undefined,
             skip: cursor ? 1 : 0,
@@ -316,7 +324,7 @@ export class PostsService {
             content: c.content,
             createdAt: c.createdAt,
             user: c.user,
-            counts: { likes: 0, replies: 0 }, // если нужно, можно денормализовать и тут
+            counts: { likes: 0, replies: 0 },
             liked: c.likes.length > 0,
         }));
 

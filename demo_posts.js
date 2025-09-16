@@ -128,8 +128,7 @@ async function importItems() {
         console.warn(`Пользователь не найден, пропускаю: ${u.email}`);
         continue;
       }
-
-      // Сколько уже есть у пользователя каждого типа
+      
       const [imgCount, reelsCount] = await Promise.all([
         prisma.post.count({ where: { userId: dbUser.id, isReels: false } }),
         prisma.post.count({ where: { userId: dbUser.id, isReels: true } })

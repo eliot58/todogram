@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
 import { Prisma } from 'generated/prisma';
@@ -20,6 +20,7 @@ export class UsersService {
                 postCount: true,
                 avatarUrl: true,
                 isVerify: true,
+                isPrivate: true,
                 createdAt: true,
             },
         });
@@ -69,11 +70,26 @@ export class UsersService {
         return { message: 'Profile updated successfully', user };
     }
 
+    async togglePrivacy(userId: number) {
+        const current = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { isPrivate: true },
+        });
+        if (!current) throw new NotFoundException('User not found');
+
+        const updated = await this.prisma.user.update({
+            where: { id: userId },
+            data: { isPrivate: !current.isPrivate },
+            select: { isPrivate: true },
+        });
+
+        return updated;
+    }
+
     async follow(userId: number, targetId: number) {
         if (userId === targetId) throw new BadRequestException('You cannot follow yourself');
 
         await this.prisma.$transaction(async (tx) => {
-            // создаст запись или бросит P2002 (уникальность)
             await tx.follower.create({ data: { followerId: userId, followingId: targetId } });
 
             await tx.user.update({
@@ -179,9 +195,11 @@ export class UsersService {
     ) {
         const exists = await this.prisma.user.findUnique({
             where: { id: targetId },
-            select: { id: true },
+            select: { id: true, isPrivate: true },
         });
         if (!exists) throw new NotFoundException('User not found');
+
+        if (exists.isPrivate) throw new ForbiddenException('User isPrivate');
 
         const take = Math.min(Math.max(limit || 20, 1), 100);
 
@@ -412,8 +430,10 @@ export class UsersService {
     }
 
     async getFollowersOfUser(viewerId: number, userId: number, cursor?: number, limit: number = 20) {
-        const exists = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+        const exists = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, isPrivate: true} });
         if (!exists) throw new NotFoundException('User not found');
+
+        if (exists.isPrivate) throw new ForbiddenException('User isPrivate');
 
         const take = Math.min(Math.max(limit || 20, 1), 100);
 
@@ -460,8 +480,10 @@ export class UsersService {
     }
 
     async getFollowingOfUser(viewerId: number, userId: number, cursor?: number, limit: number = 20) {
-        const exists = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+        const exists = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, isPrivate: true } });
         if (!exists) throw new NotFoundException('User not found');
+
+        if (exists.isPrivate) throw new ForbiddenException('User isPrivate');
 
         const take = Math.min(Math.max(limit || 20, 1), 100);
 

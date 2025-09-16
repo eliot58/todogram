@@ -62,6 +62,11 @@ export class UsersController {
         return this.usersService.updateProfile(request.userId, dto, avatar);
     }
 
+    @Patch('me/privacy/toggle')
+    async togglePrivacy(@Req() request: RequestWithAuth) {
+        return this.usersService.togglePrivacy(request.userId);
+    }
+
     @Post(':id/follow')
     async follow(@Req() request: RequestWithAuth, @Param('id') id: number) {
         return this.usersService.follow(request.userId, id);
@@ -247,7 +252,7 @@ export class UsersController {
         if (request.userId === id) {
             throw new BadRequestException('Нельзя добавить самого себя в близкие друзья');
         }
-        
+
         return this.usersService.addToCloseFriends(request.userId, id);
     }
 
