@@ -513,4 +513,82 @@ export class UsersService {
         return !existing;
     }
 
+
+    async addToCloseFriends(ownerId: number, friendId: number) {
+        const friend = await this.prisma.user.findUnique({ where: { id: friendId }, select: { id: true } });
+        if (!friend) throw new NotFoundException('User not found');
+
+        try {
+            const item = await this.prisma.closeFriend.create({
+                data: { ownerId, friendId },
+                include: {
+                    friend: {
+                        select: { id: true, username: true, fullName: true, avatarUrl: true, isPrivate: true, isVerify: true },
+                    },
+                },
+            });
+            return { ok: true, item };
+        } catch (e) {
+            if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+                const item = await this.prisma.closeFriend.findUnique({
+                    where: { ownerId_friendId: { ownerId, friendId } },
+                    include: {
+                        friend: { select: { id: true, username: true, fullName: true, avatarUrl: true, isPrivate: true, isVerify: true } },
+                    },
+                });
+                return { ok: true, item };
+            }
+            throw e;
+        }
+    }
+
+    async removeFromCloseFriends(ownerId: number, friendId: number) {
+        const exists = await this.prisma.closeFriend.findUnique({
+            where: { ownerId_friendId: { ownerId, friendId } },
+            select: { id: true },
+        });
+
+        if (!exists) return { ok: true, removed: false };
+
+        await this.prisma.closeFriend.delete({
+            where: { ownerId_friendId: { ownerId, friendId } },
+        });
+
+        return { ok: true, removed: true };
+    }
+
+    async getMyCloseFriends(viewerId: number, cursor?: number, limit: number = 20) {
+        const take = Math.min(Math.max(limit || 20, 1), 100);
+      
+        const rows = await this.prisma.closeFriend.findMany({
+          where: { ownerId: viewerId },
+          orderBy: { id: 'desc' },
+          cursor: cursor ? { id: cursor } : undefined,
+          skip: cursor ? 1 : 0,
+          take,
+          include: {
+            friend: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        });
+      
+        const items = rows.map(({ friend }) => ({
+          id: friend.id,
+          username: friend.username,
+          fullName: friend.fullName,
+          avatarUrl: friend.avatarUrl,
+        }));
+      
+        const nextCursor = rows.length === take ? rows[rows.length - 1].id : null;
+      
+        return { items, nextCursor };
+      }
+      
+
 }

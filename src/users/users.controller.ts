@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequestWithAuth } from '../auth/auth.types';
@@ -237,5 +237,36 @@ export class UsersController {
     async checkUsername(@Query('username') username: string) {
         const available = await this.usersService.isUsernameAvailable(username);
         return { available };
+    }
+
+    @Post('close-friends/:id')
+    async addToCloseFriends(
+        @Req() request: RequestWithAuth,
+        @Param('id') id: number,
+    ) {
+        if (request.userId === id) {
+            throw new BadRequestException('Нельзя добавить самого себя в близкие друзья');
+        }
+        
+        return this.usersService.addToCloseFriends(request.userId, id);
+    }
+
+    @Delete('close-friends/:id')
+    async removeFromCloseFriends(
+        @Req() request: RequestWithAuth,
+        @Param('id') id: number,
+    ) {
+        return this.usersService.removeFromCloseFriends(request.userId, id);
+    }
+
+    @Get('me/close-friends')
+    @ApiQuery({ name: 'cursor', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    async getMyCloseFriends(
+        @Req() request: RequestWithAuth,
+        @Query('cursor') cursor?: number,
+        @Query('limit') limit: number = 20,
+    ) {
+        return this.usersService.getMyCloseFriends(request.userId, cursor, limit);
     }
 }
