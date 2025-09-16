@@ -139,7 +139,7 @@ async function importItems() {
       const needReels  = Math.max(0, POSTS_PER_KIND - reelsCount);
 
       if (needImages === 0 && needReels === 0) {
-        console.log(`У ${u.email} уже есть 5 обычных и 5 рилсов — пропускаю`);
+        console.log(`У ${dbUser.email} уже есть 5 обычных и 5 рилсов — пропускаю`);
         continue;
       }
 
