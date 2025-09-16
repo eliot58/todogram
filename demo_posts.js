@@ -117,14 +117,11 @@ async function createReelPost(userId) {
 // --- Основной импорт ---
 async function importItems() {
   try {
-    const raw = fs.readFileSync('./users.json', 'utf8');
-    const users = JSON.parse(raw);
-
     let totalCreated = 0;
 
-    for (const u of users) {
+    for (let j = 1; j <= 200; j++) {
       const dbUser = await prisma.user.findUnique({
-        where: { email: u.email },
+        where: { id: j },
         select: { id: true, email: true }
       });
       if (!dbUser) {
