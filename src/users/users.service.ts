@@ -89,23 +89,137 @@ export class UsersService {
     async follow(userId: number, targetId: number) {
         if (userId === targetId) throw new BadRequestException('You cannot follow yourself');
 
-        await this.prisma.$transaction(async (tx) => {
-            await tx.follower.create({ data: { followerId: userId, followingId: targetId } });
+        const target = await this.prisma.user.findUnique({
+            where: { id: targetId },
+            select: { id: true, isPrivate: true },
+        });
+        if (!target) throw new NotFoundException('User not found');
 
-            await tx.user.update({
-                where: { id: targetId },
-                data: { followersCount: { increment: 1 } },
+        const already = await this.prisma.follower.findUnique({
+            where: { followerId_followingId: { followerId: userId, followingId: targetId } },
+        });
+        if (already) return { message: 'Already following this user' };
+
+        if (target.isPrivate) {
+            await this.prisma.followRequest.upsert({
+                where: { requesterId_targetId: { requesterId: userId, targetId } },
+                update: { status: 'PENDING' },
+                create: { requesterId: userId, targetId, status: 'PENDING' },
+                select: { id: true, status: true, createdAt: true },
             });
-            await tx.user.update({
-                where: { id: userId },
-                data: { followingCount: { increment: 1 } },
+
+            return { message: 'Account is private request created' };
+        }
+
+        await this.prisma.$transaction(async (tx) => {
+            await tx.follower.create({
+                data: { followerId: userId, followingId: targetId },
             });
-        }).catch((e: any) => {
-            if (e?.code === 'P2002') throw new BadRequestException('Already following this user');
-            throw e;
+            await tx.user.update({ where: { id: userId }, data: { followingCount: { increment: 1 } } });
+            await tx.user.update({ where: { id: targetId }, data: { followersCount: { increment: 1 } } });
+            await tx.followRequest.deleteMany({ where: { requesterId: userId, targetId } });
         });
 
         return { message: 'Successfully followed the user' };
+    }
+
+    async cancelFollowRequest(viewerId: number, targetId: number) {
+        await this.prisma.followRequest.deleteMany({
+            where: { requesterId: viewerId, targetId, status: 'PENDING' },
+        });
+        return { status: 'canceled' };
+    }
+
+    async acceptFollowRequest(targetId: number, requesterId: number) {
+        const req = await this.prisma.followRequest.findUnique({
+            where: { requesterId_targetId: { requesterId, targetId } },
+            select: { status: true },
+        });
+        if (!req || req.status !== 'PENDING') throw new NotFoundException('Request not found');
+
+        await this.prisma.$transaction(async (tx) => {
+            await tx.follower.upsert({
+                where: { followerId_followingId: { followerId: requesterId, followingId: targetId } },
+                update: {},
+                create: { followerId: requesterId, followingId: targetId },
+            });
+
+            await tx.user.update({ where: { id: requesterId }, data: { followingCount: { increment: 1 } } });
+            await tx.user.update({ where: { id: targetId }, data: { followersCount: { increment: 1 } } });
+
+            await tx.followRequest.update({
+                where: { requesterId_targetId: { requesterId, targetId } },
+                data: { status: 'ACCEPTED' },
+            });
+        });
+
+        return { status: 'accepted' };
+    }
+
+    async rejectFollowRequest(targetId: number, requesterId: number) {
+        const req = await this.prisma.followRequest.findUnique({
+            where: { requesterId_targetId: { requesterId, targetId } },
+            select: { status: true },
+        });
+        if (!req || req.status !== 'PENDING') throw new NotFoundException('Request not found');
+
+        await this.prisma.followRequest.update({
+            where: { requesterId_targetId: { requesterId, targetId } },
+            data: { status: 'REJECTED' },
+        });
+        return { status: 'rejected' };
+    }
+    
+    async listIncomingFollowRequests(userId: number, cursor?: number, limit: number = 20) {
+        const take = Math.min(Math.max(limit || 20, 1), 100);
+        const rows = await this.prisma.followRequest.findMany({
+            where: { targetId: userId, status: 'PENDING' },
+            orderBy: { id: 'desc' },
+            cursor: cursor ? { id: cursor } : undefined,
+            skip: cursor ? 1 : 0,
+            take,
+            select: {
+                id: true,
+                requesterId: true,
+                createdAt: true,
+                requester: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
+            },
+        });
+
+        const items = rows.map((r) => ({
+            id: r.id,
+            requester: r.requester,
+            createdAt: r.createdAt,
+        }));
+        const nextCursor = rows.length === take ? rows[rows.length - 1].id : null;
+
+        return { items, nextCursor };
+    }
+
+    async listOutgoingFollowRequests(userId: number, cursor?: number, limit: number = 20) {
+        const take = Math.min(Math.max(limit || 20, 1), 100);
+        const rows = await this.prisma.followRequest.findMany({
+            where: { requesterId: userId, status: 'PENDING' },
+            orderBy: { id: 'desc' },
+            cursor: cursor ? { id: cursor } : undefined,
+            skip: cursor ? 1 : 0,
+            take,
+            select: {
+                id: true,
+                targetId: true,
+                createdAt: true,
+                target: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
+            },
+        });
+
+        const items = rows.map((r) => ({
+            id: r.id,
+            target: r.target,
+            createdAt: r.createdAt,
+        }));
+        const nextCursor = rows.length === take ? rows[rows.length - 1].id : null;
+
+        return { items, nextCursor };
     }
 
     async unfollow(userId: number, targetId: number) {
@@ -401,6 +515,7 @@ export class UsersService {
                 followersCount: true,
                 followingCount: true,
                 postCount: true,
+                isPrivate: true,
                 followers: { where: { followerId: viewerId }, select: { id: true }, take: 1 },
                 following: { where: { followingId: viewerId }, select: { id: true }, take: 1 },
             },
@@ -417,6 +532,7 @@ export class UsersService {
             fullName: user.fullName,
             avatarUrl: user.avatarUrl,
             bio: user.bio,
+            isPrivate: user.isPrivate,
             counts: {
                 followers: user.followersCount,
                 following: user.followingCount,
@@ -430,7 +546,7 @@ export class UsersService {
     }
 
     async getFollowersOfUser(viewerId: number, userId: number, cursor?: number, limit: number = 20) {
-        const exists = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, isPrivate: true} });
+        const exists = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, isPrivate: true } });
         if (!exists) throw new NotFoundException('User not found');
 
         if (exists.isPrivate) throw new ForbiddenException('User isPrivate');

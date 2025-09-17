@@ -28,10 +28,7 @@ import { ChatModule } from './chat/chat.module';
       useFactory: (config: ConfigService) => {
         const user = config.get<string>('EMAIL_HOST_USER');
         const pass = config.get<string>('EMAIL_HOST_PASSWORD');
-
-        console.log(user)
-        console.log(pass)
-
+        
         return {
           transport: {
             host: 'smtp.mail.ru',

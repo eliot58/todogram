@@ -44,6 +44,30 @@ model User {
 
   closeFriends     CloseFriend[] @relation("UserCloseFriendsOwner")
   inCloseFriendsOf CloseFriend[] @relation("UserCloseFriendsMember")
+
+  incomingFollowRequests FollowRequest[] @relation("FollowRequestsIncoming")
+  outgoingFollowRequests FollowRequest[] @relation("FollowRequestsOutgoing")
+}
+
+enum FollowRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model FollowRequest {
+  id          Int                  @id @default(autoincrement())
+  requester   User                 @relation("FollowRequestsOutgoing", fields: [requesterId], references: [id], onDelete: Cascade)
+  requesterId Int
+  target      User                 @relation("FollowRequestsIncoming", fields: [targetId], references: [id], onDelete: Cascade)
+  targetId    Int
+  status      FollowRequestStatus  @default(PENDING)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@unique([requesterId, targetId])
+  @@index([targetId, createdAt])
+  @@index([requesterId, createdAt])
 }
 
 model Follower {

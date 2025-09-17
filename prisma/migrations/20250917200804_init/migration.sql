@@ -1,3 +1,6 @@
+-- CreateEnum
+CREATE TYPE "public"."FollowRequestStatus" AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED');
+
 -- CreateTable
 CREATE TABLE "public"."User" (
     "id" SERIAL NOT NULL,
@@ -17,6 +20,18 @@ CREATE TABLE "public"."User" (
     "postCount" INTEGER NOT NULL DEFAULT 0,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."FollowRequest" (
+    "id" SERIAL NOT NULL,
+    "requesterId" INTEGER NOT NULL,
+    "targetId" INTEGER NOT NULL,
+    "status" "public"."FollowRequestStatus" NOT NULL DEFAULT 'PENDING',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "FollowRequest_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -139,6 +154,15 @@ CREATE UNIQUE INDEX "User_username_key" ON "public"."User"("username");
 CREATE UNIQUE INDEX "User_email_key" ON "public"."User"("email");
 
 -- CreateIndex
+CREATE INDEX "FollowRequest_targetId_createdAt_idx" ON "public"."FollowRequest"("targetId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "FollowRequest_requesterId_createdAt_idx" ON "public"."FollowRequest"("requesterId", "createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "FollowRequest_requesterId_targetId_key" ON "public"."FollowRequest"("requesterId", "targetId");
+
+-- CreateIndex
 CREATE INDEX "Follower_followerId_createdAt_idx" ON "public"."Follower"("followerId", "createdAt");
 
 -- CreateIndex
@@ -212,6 +236,12 @@ CREATE INDEX "CommentLike_userId_createdAt_idx" ON "public"."CommentLike"("userI
 
 -- CreateIndex
 CREATE UNIQUE INDEX "CommentLike_userId_commentId_key" ON "public"."CommentLike"("userId", "commentId");
+
+-- AddForeignKey
+ALTER TABLE "public"."FollowRequest" ADD CONSTRAINT "FollowRequest_requesterId_fkey" FOREIGN KEY ("requesterId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."FollowRequest" ADD CONSTRAINT "FollowRequest_targetId_fkey" FOREIGN KEY ("targetId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."Follower" ADD CONSTRAINT "Follower_followerId_fkey" FOREIGN KEY ("followerId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -72,6 +72,35 @@ export class UsersController {
         return this.usersService.follow(request.userId, id);
     }
 
+    @Delete('follow-requests/:targetId/cancel')
+    async cancelFollowRequest(@Req() req: RequestWithAuth, @Param('targetId') targetId: number) {
+        return this.usersService.cancelFollowRequest(req.userId, targetId);
+    }
+
+    @Post('follow-requests/:requesterId/accept')
+    async acceptFollowRequest(@Req() req: RequestWithAuth, @Param('requesterId') requesterId: number) {
+        return this.usersService.acceptFollowRequest(req.userId, requesterId);
+    }
+
+    @Post('follow-requests/:requesterId/reject')
+    async rejectFollowRequest(@Req() req: RequestWithAuth, @Param('requesterId') requesterId: number) {
+        return this.usersService.rejectFollowRequest(req.userId, requesterId);
+    }
+
+    @Get('follow-requests/incoming')
+    @ApiQuery({ name: 'cursor', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    async listIncoming(@Req() req: RequestWithAuth, @Query('cursor') cursor?: number, @Query('limit') limit: number = 20) {
+        return this.usersService.listIncomingFollowRequests(req.userId, cursor, limit);
+    }
+
+    @Get('follow-requests/outgoing')
+    @ApiQuery({ name: 'cursor', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    async listOutgoing(@Req() req: RequestWithAuth, @Query('cursor') cursor?: number, @Query('limit') limit: number = 20) {
+        return this.usersService.listOutgoingFollowRequests(req.userId, cursor, limit);
+    }
+
     @Post(':id/unfollow')
     async unfollow(@Req() request: RequestWithAuth, @Param('id') id: number) {
         return this.usersService.unfollow(request.userId, id);

@@ -226,10 +226,10 @@ export class AuthService {
 
             const fromEmail = this.configService.get<string>('EMAIL_HOST_USER');
             const html = `
-            <h2>Восстановление пароля</h2>
-            <p>Ваш код для сброса пароля: <strong>${code}</strong></p>
-            <p>Срок действия кода — 10 минут.</p>
-          `;
+                <h2>Восстановление пароля</h2>
+                <p>Ваш код для сброса пароля: <strong>${code}</strong></p>
+                <p>Срок действия кода — 10 минут.</p>
+            `;
 
             await this.mailService.sendMail({
                 from: fromEmail,
