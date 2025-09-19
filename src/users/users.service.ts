@@ -265,9 +265,10 @@ export class UsersService {
 
         return {
             items: slice.map((r) => ({
-                relId: r.id,
-                followedAt: r.createdAt,
-                user: r.follower,
+                id: r.follower.id,
+                username: r.follower.username,
+                fullName: r.follower.fullName,
+                avatarUrl: r.follower.avatarUrl
             })),
             nextCursor: hasMore ? slice[slice.length - 1].id : null,
         };
@@ -294,9 +295,10 @@ export class UsersService {
 
         return {
             items: slice.map((r) => ({
-                relId: r.id,
-                followedAt: r.createdAt,
-                user: r.following,
+                id: r.following.id,
+                username: r.following.username,
+                fullName: r.following.fullName,
+                avatarUrl: r.following.avatarUrl
             })),
             nextCursor: hasMore ? slice[slice.length - 1].id : null,
         };

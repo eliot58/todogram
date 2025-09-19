@@ -122,6 +122,7 @@ export class PostsService {
         const posts = await this.prisma.post.findMany({
             where: {
                 user: { isPrivate: false },
+                userId: { not: viewerId }, 
             },
             orderBy: { id: 'desc' },
             cursor: cursor ? { id: cursor } : undefined,
@@ -192,7 +193,8 @@ export class PostsService {
                 isReels: true,
                 user: {
                     isPrivate: false
-                }
+                },
+                userId: { not: viewerId }, 
             },
             orderBy: { id: 'desc' },
             cursor: cursor ? { id: cursor } : undefined,
