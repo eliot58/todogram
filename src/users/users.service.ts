@@ -169,7 +169,7 @@ export class UsersService {
         });
         return { status: 'rejected' };
     }
-    
+
     async listIncomingFollowRequests(userId: number, cursor?: number, limit: number = 20) {
         const take = Math.min(Math.max(limit || 20, 1), 100);
         const rows = await this.prisma.followRequest.findMany({
@@ -344,6 +344,11 @@ export class UsersService {
                         fullName: true,
                         avatarUrl: true,
                         followers: { where: { followerId: viewerId }, select: { id: true }, take: 1 },
+                        incomingFollowRequests: {
+                            where: { requesterId: viewerId },
+                            select: { id: true, status: true },
+                            take: 1,
+                        },
                     },
                 },
                 likes: { where: { userId: viewerId }, select: { id: true }, take: 1 },
@@ -351,30 +356,34 @@ export class UsersService {
             },
         });
 
-        const items = posts.map((p) => ({
-            id: p.id,
-            caption: p.caption,
-            isReels: p.isReels,
-            videoUrl: p.videoUrl,
-            thumbnail: p.thumbnail,
-            createdAt: p.createdAt,
-            user: {
-                id: p.user.id,
-                username: p.user.username,
-                fullName: p.user.fullName,
-                avatarUrl: p.user.avatarUrl,
-            },
-            images: p.images,
-            counts: {
-                likes: p.likesCount,
-                comments: p.commentsCount,
-                saved: p.savedCount,
-                shared: p.shareCount,
-            },
-            liked: p.likes.length > 0,
-            saved: p.savedBy.length > 0,
-            followsAuthor: p.user.followers.length > 0,
-        }));
+        const items = posts.map((p) => {
+            const followReq = p.user.incomingFollowRequests?.[0] || null;
+            return {
+                id: p.id,
+                caption: p.caption,
+                isReels: p.isReels,
+                videoUrl: p.videoUrl,
+                thumbnail: p.thumbnail,
+                createdAt: p.createdAt,
+                user: {
+                    id: p.user.id,
+                    username: p.user.username,
+                    fullName: p.user.fullName,
+                    avatarUrl: p.user.avatarUrl,
+                },
+                images: p.images,
+                counts: {
+                    likes: p.likesCount,
+                    comments: p.commentsCount,
+                    saved: p.savedCount,
+                    shared: p.shareCount,
+                },
+                liked: p.likes.length > 0,
+                saved: p.savedBy.length > 0,
+                followsAuthor: p.user.followers.length > 0,
+                followRequest: followReq ? { id: followReq.id, status: followReq.status } : null,
+            };
+        });
 
         const hasMore = posts.length === take;
         const nextCursor = hasMore ? posts[posts.length - 1].id : null;
@@ -520,6 +529,11 @@ export class UsersService {
                 isPrivate: true,
                 followers: { where: { followerId: viewerId }, select: { id: true }, take: 1 },
                 following: { where: { followingId: viewerId }, select: { id: true }, take: 1 },
+                incomingFollowRequests: {
+                    where: { requesterId: viewerId },
+                    select: { id: true, status: true },
+                    take: 1,
+                },
             },
         });
 
@@ -527,6 +541,8 @@ export class UsersService {
 
         const isFollowedByViewer = user.followers.length > 0;
         const isFollowingViewer = user.following.length > 0;
+
+        const outgoingReq = user.incomingFollowRequests[0] || null;
 
         return {
             id: user.id,
@@ -538,19 +554,28 @@ export class UsersService {
             counts: {
                 followers: user.followersCount,
                 following: user.followingCount,
-                posts: user.postCount
+                posts: user.postCount,
             },
             viewer: {
                 isFollowing: isFollowedByViewer,
                 isFollowedBy: isFollowingViewer,
+                followRequest: outgoingReq ? { id: outgoingReq.id, status: outgoingReq.status } : null,
             },
         };
     }
 
-    async getFollowersOfUser(viewerId: number, userId: number, cursor?: number, limit: number = 20) {
-        const exists = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, isPrivate: true } });
-        if (!exists) throw new NotFoundException('User not found');
 
+    async getFollowersOfUser(
+        viewerId: number,
+        userId: number,
+        cursor?: number,
+        limit: number = 20,
+    ) {
+        const exists = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true, isPrivate: true },
+        });
+        if (!exists) throw new NotFoundException('User not found');
         if (exists.isPrivate) throw new ForbiddenException('User isPrivate');
 
         const take = Math.min(Math.max(limit || 20, 1), 100);
@@ -572,35 +597,55 @@ export class UsersService {
                         followingCount: true,
                         followers: { where: { followerId: viewerId }, select: { id: true }, take: 1 },
                         following: { where: { followingId: viewerId }, select: { id: true }, take: 1 },
+                        incomingFollowRequests: {
+                            where: { requesterId: viewerId },
+                            select: { id: true, status: true },
+                            take: 1,
+                        },
                     },
                 },
             },
         });
 
-        const items = rows.map(({ follower }) => ({
-            id: follower.id,
-            username: follower.username,
-            fullName: follower.fullName,
-            avatarUrl: follower.avatarUrl,
-            counts: {
-                followers: follower.followersCount,
-                following: follower.followingCount,
-            },
-            viewer: {
-                isFollowing: follower.followers.length > 0,
-                isFollowedBy: follower.following.length > 0,
-            },
-            isMe: follower.id === viewerId,
-        }));
+        const items = rows.map(({ follower }) => {
+            const isFollowing = follower.followers.length > 0;
+            const isFollowedBy = follower.following.length > 0;
+            const req = follower.incomingFollowRequests[0] || null;
+
+            return {
+                id: follower.id,
+                username: follower.username,
+                fullName: follower.fullName,
+                avatarUrl: follower.avatarUrl,
+                counts: {
+                    followers: follower.followersCount,
+                    following: follower.followingCount,
+                },
+                viewer: {
+                    isFollowing,
+                    isFollowedBy,
+                    followRequest: req ? { id: req.id, status: req.status } : null,
+                },
+                isMe: follower.id === viewerId,
+            };
+        });
 
         const nextCursor = rows.length === take ? rows[rows.length - 1].id : null;
         return { items, nextCursor };
     }
 
-    async getFollowingOfUser(viewerId: number, userId: number, cursor?: number, limit: number = 20) {
-        const exists = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, isPrivate: true } });
-        if (!exists) throw new NotFoundException('User not found');
 
+    async getFollowingOfUser(
+        viewerId: number,
+        userId: number,
+        cursor?: number,
+        limit: number = 20,
+    ) {
+        const exists = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true, isPrivate: true },
+        });
+        if (!exists) throw new NotFoundException('User not found');
         if (exists.isPrivate) throw new ForbiddenException('User isPrivate');
 
         const take = Math.min(Math.max(limit || 20, 1), 100);
@@ -622,30 +667,43 @@ export class UsersService {
                         followingCount: true,
                         followers: { where: { followerId: viewerId }, select: { id: true }, take: 1 },
                         following: { where: { followingId: viewerId }, select: { id: true }, take: 1 },
+                        incomingFollowRequests: {
+                            where: { requesterId: viewerId },
+                            select: { id: true, status: true },
+                            take: 1,
+                        },
                     },
                 },
             },
         });
 
-        const items = rows.map(({ following }) => ({
-            id: following.id,
-            username: following.username,
-            fullName: following.fullName,
-            avatarUrl: following.avatarUrl,
-            counts: {
-                followers: following.followersCount,
-                following: following.followingCount,
-            },
-            viewer: {
-                isFollowing: following.followers.length > 0,
-                isFollowedBy: following.following.length > 0,
-            },
-            isMe: following.id === viewerId,
-        }));
+        const items = rows.map(({ following }) => {
+            const isFollowing = following.followers.length > 0;
+            const isFollowedBy = following.following.length > 0;
+            const req = following.incomingFollowRequests[0] || null;
+
+            return {
+                id: following.id,
+                username: following.username,
+                fullName: following.fullName,
+                avatarUrl: following.avatarUrl,
+                counts: {
+                    followers: following.followersCount,
+                    following: following.followingCount,
+                },
+                viewer: {
+                    isFollowing,
+                    isFollowedBy,
+                    followRequest: req ? { id: req.id, status: req.status } : null,
+                },
+                isMe: following.id === viewerId,
+            };
+        });
 
         const nextCursor = rows.length === take ? rows[rows.length - 1].id : null;
         return { items, nextCursor };
     }
+
 
     async isUsernameAvailable(username: string): Promise<boolean> {
         const existing = await this.prisma.user.findFirst({

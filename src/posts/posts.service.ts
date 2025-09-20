@@ -116,13 +116,14 @@ export class PostsService {
         return { message: 'Deleted' };
     }
 
-    async getAllPosts(viewerId: number, { cursor, limit }: { cursor?: number; limit?: number }) {
+    async getAllPosts(viewerId: number, { isReels, cursor, limit }: { isReels: boolean; cursor?: number; limit?: number }) {
         const take = Math.min(Math.max(limit || 20, 1), 100);
 
         const posts = await this.prisma.post.findMany({
             where: {
                 user: { isPrivate: false },
                 userId: { not: viewerId }, 
+                isReels
             },
             orderBy: { id: 'desc' },
             cursor: cursor ? { id: cursor } : undefined,
@@ -147,6 +148,11 @@ export class PostsService {
                         fullName: true,
                         avatarUrl: true,
                         followers: { where: { followerId: viewerId }, select: { id: true }, take: 1 },
+                        incomingFollowRequests: {
+                            where: { requesterId: viewerId },
+                            select: { id: true, status: true },
+                            take: 1,
+                        },
                     },
                 },
                 likes: { where: { userId: viewerId }, select: { id: true }, take: 1 },
@@ -154,92 +160,34 @@ export class PostsService {
             },
         });
 
-        const items = posts.map((p) => ({
-            id: p.id,
-            caption: p.caption,
-            isReels: p.isReels,
-            videoUrl: p.videoUrl,
-            thumbnail: p.thumbnail,
-            createdAt: p.createdAt,
-            user: {
-                id: p.user.id,
-                username: p.user.username,
-                fullName: p.user.fullName,
-                avatarUrl: p.user.avatarUrl,
-            },
-            images: p.images,
-            counts: {
-                likes: p.likesCount,
-                comments: p.commentsCount,
-                saved: p.savedCount,
-                shared: p.shareCount,
-            },
-            liked: p.likes.length > 0,
-            saved: p.savedBy.length > 0,
-            followsAuthor: p.user.followers.length > 0,
-        }));
-
-        const hasMore = posts.length === take;
-        const nextCursor = hasMore ? posts[posts.length - 1].id : null;
-
-        return { items, nextCursor };
-    }
-
-    async getAllReels(viewerId: number, { cursor, limit }: { cursor?: number; limit?: number }) {
-        const take = Math.min(Math.max(limit || 20, 1), 100);
-
-        const posts = await this.prisma.post.findMany({
-            where: { 
-                isReels: true,
+        const items = posts.map((p) => {
+            const followReq = p.user.incomingFollowRequests?.[0] || null;
+            return {
+                id: p.id,
+                caption: p.caption,
+                isReels: p.isReels,
+                videoUrl: p.videoUrl,
+                thumbnail: p.thumbnail,
+                createdAt: p.createdAt,
                 user: {
-                    isPrivate: false
+                    id: p.user.id,
+                    username: p.user.username,
+                    fullName: p.user.fullName,
+                    avatarUrl: p.user.avatarUrl,
                 },
-                userId: { not: viewerId }, 
-            },
-            orderBy: { id: 'desc' },
-            cursor: cursor ? { id: cursor } : undefined,
-            skip: cursor ? 1 : 0,
-            take,
-            select: {
-                id: true,
-                caption: true,
-                isReels: true,
-                videoUrl: true,
-                thumbnail: true,
-                createdAt: true,
-                likesCount: true,
-                commentsCount: true,
-                savedCount: true,
-                shareCount: true,
-                images: { orderBy: { position: 'asc' }, select: { id: true, url: true, position: true, createdAt: true } },
-                user: {
-                    select: {
-                        id: true,
-                        username: true,
-                        fullName: true,
-                        avatarUrl: true,
-                        followers: { where: { followerId: viewerId }, select: { id: true }, take: 1 },
-                    },
+                images: p.images,
+                counts: {
+                    likes: p.likesCount,
+                    comments: p.commentsCount,
+                    saved: p.savedCount,
+                    shared: p.shareCount,
                 },
-                likes: { where: { userId: viewerId }, select: { id: true }, take: 1 },
-                savedBy: { where: { userId: viewerId }, select: { id: true }, take: 1 },
-            },
+                liked: p.likes.length > 0,
+                saved: p.savedBy.length > 0,
+                followsAuthor: p.user.followers.length > 0,
+                followRequest: followReq ? { id: followReq.id, status: followReq.status } : null,
+            };
         });
-
-        const items = posts.map((p) => ({
-            id: p.id,
-            caption: p.caption,
-            isReels: p.isReels,
-            videoUrl: p.videoUrl,
-            thumbnail: p.thumbnail,
-            createdAt: p.createdAt,
-            user: { id: p.user.id, username: p.user.username, fullName: p.user.fullName, avatarUrl: p.user.avatarUrl },
-            images: p.images,
-            counts: { likes: p.likesCount, comments: p.commentsCount, saved: p.savedCount, shared: p.shareCount },
-            liked: p.likes.length > 0,
-            saved: p.savedBy.length > 0,
-            followsAuthor: p.user.followers.length > 0,
-        }));
 
         const hasMore = posts.length === take;
         const nextCursor = hasMore ? posts[posts.length - 1].id : null;

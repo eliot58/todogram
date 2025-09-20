@@ -87,7 +87,7 @@ export class PostsController {
         @Query('cursor') cursor?: number,
         @Query('limit') limit: number = 20,
     ) {
-        return this.postsService.getAllPosts(request.userId, { cursor, limit });
+        return this.postsService.getAllPosts(request.userId, { cursor, limit, isReels: false });
     }
 
     @Get('reels')
@@ -98,7 +98,7 @@ export class PostsController {
         @Query('cursor') cursor?: number,
         @Query('limit') limit: number = 20,
     ) {
-        return this.postsService.getAllReels(request.userId, { cursor, limit });
+        return this.postsService.getAllPosts(request.userId, { cursor, limit, isReels: true });
     }
 
     // ---------- COMMENTS ----------
