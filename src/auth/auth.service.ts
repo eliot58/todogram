@@ -73,7 +73,6 @@ export class AuthService {
         return { message: 'Код подтверждения был отправлен на вашу почту' };
     }
 
-
     public async resendVerification(login: string) {
         const user = await this.prisma.user.findFirst({
             where: {
