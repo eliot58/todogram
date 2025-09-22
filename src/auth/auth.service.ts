@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { AccessPayload, RefreshPayload } from './jwt.interface';
 import { JwtService } from '@nestjs/jwt';
 import { ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS } from '../constants/auth.constants';
@@ -85,8 +85,7 @@ export class AuthService {
             select: { id: true, isVerify: true, email: true }
         });
 
-        if (!user) throw new BadRequestException('Пользователь не найден');
-
+        if (!user) throw new NotFoundException('Пользователь не найден');
         if (user.isVerify) throw new BadRequestException('Аккаунт уже подтверждён');
 
         const cooldownKey = `otp:cooldown:${user.id}`;
@@ -126,7 +125,7 @@ export class AuthService {
             select: { id: true, isVerify: true }
         });
 
-        if (!user) throw new BadRequestException('Пользователь не найден');
+        if (!user) throw new NotFoundException('Пользователь не найден');
         if (user.isVerify) throw new BadRequestException('Аккаунт уже подтверждён');
 
         const otp = await this.redisService.getKey(`otp:${user.id}`);
@@ -203,7 +202,7 @@ export class AuthService {
     public async forgotPassword(email: string) {
         const user = await this.prisma.user.findUnique({ where: { email }, select: { id: true } });
 
-        if (!user) throw new BadRequestException('Пользователь не найден');
+        if (!user) throw new NotFoundException('Пользователь не найден');
 
         const cooldownKey = `fp:cooldown:${email}`;
         const onCooldown = await this.redisService.getKey(cooldownKey);
