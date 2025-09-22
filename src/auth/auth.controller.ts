@@ -13,7 +13,7 @@ export class AuthController {
 
     @Post('resend-verify')
     async resendVerify(@Body() dto: ResendVerifyDto) {
-        return this.authService.resendVerification(dto.email);
+        return this.authService.resendVerification(dto.login);
     }
 
     @Post('verify')

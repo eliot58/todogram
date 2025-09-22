@@ -74,10 +74,16 @@ export class AuthService {
     }
 
 
-    public async resendVerification(email: string) {
-        const user = await this.prisma.user.findUnique({
-            where: { email },
-            select: { id: true, isVerify: true }
+    public async resendVerification(login: string) {
+        const user = await this.prisma.user.findFirst({
+            where: {
+                OR: [
+                    { email: login },
+                    { username: login },
+                    { phone: login }
+                ]
+            },
+            select: { id: true, isVerify: true, email: true }
         });
 
         if (!user) throw new BadRequestException('Пользователь не найден');
@@ -101,7 +107,7 @@ export class AuthService {
 
         await this.mailService.sendMail({
             from: fromEmail,
-            to: email,
+            to: user.email,
             subject: 'Код подтверждения аккаунта',
             html: message,
         });
@@ -114,9 +120,11 @@ export class AuthService {
             where: {
                 OR: [
                     { email: login },
+                    { username: login },
                     { phone: login }
                 ]
-            }
+            },
+            select: { id: true, isVerify: true }
         });
 
         if (!user) throw new BadRequestException('Пользователь не найден');
@@ -152,7 +160,8 @@ export class AuthService {
                     { username: login },
                     { phone: login }
                 ]
-            }
+            },
+            select: { id: true, isVerify: true, passwordHash: true }
         });
 
         if (!user) throw new UnauthorizedException('Неверные учетные данные');

@@ -79,9 +79,9 @@ export class RestorePasswordDto {
 }
 
 export class ResendVerifyDto {
-  @IsEmail()
+  @IsString()
   @ApiProperty()
-  email: string;
+  login: string;
 }
 
 export class TokenVerifyDto {
