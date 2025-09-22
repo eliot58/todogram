@@ -34,14 +34,14 @@ export class AuthService {
 
     public async signup(username: string, email: string, password: string, fullName: string, phone: string) {
         const exists = await this.prisma.user.findFirst({
-            where: { OR: [{ username }, { email }] }
+            where: { OR: [{ username }, { email }, { phone }] }
         });
 
-        if (exists) throw new BadRequestException('User already exists');
+        if (exists) throw new BadRequestException('Пользователь уже существует');
 
         const passwordHash = await bcrypt.hash(password, 10);
 
-        await this.prisma.user.create({
+        const newUser = await this.prisma.user.create({
             data: {
                 username,
                 fullName,
@@ -51,15 +51,10 @@ export class AuthService {
             }
         });
 
-        const cooldownKey = `otp:cooldown:${email}`;
-        const onCooldown = await this.redisService.getKey(cooldownKey);
-        if (onCooldown) {
-            return { message: 'OTP has already been sent. Please wait before requesting again.' };
-        }
-
+        const cooldownKey = `otp:cooldown:${newUser.id}`;
         const code = Math.floor(100000 + Math.random() * 900000).toString();
 
-        await this.redisService.setKey(`otp:${email}`, code, 600);
+        await this.redisService.setKey(`otp:${newUser.id}`, code, 600);
         await this.redisService.setKey(cooldownKey, '1', 60);
 
         const fromEmail = this.configService.get<string>('EMAIL_HOST_USER');
@@ -75,78 +70,73 @@ export class AuthService {
             html: message,
         });
 
-        return { message: 'OTP has been sent to your email' };
+        return { message: 'Код подтверждения был отправлен на вашу почту' };
     }
 
 
     public async resendVerification(email: string) {
-        const cooldownKey = `otp:cooldown:${email}`;
-        const onCooldown = await this.redisService.getKey(cooldownKey);
-        if (onCooldown) {
-            return { message: 'If this email is registered, a verification code has been sent.' };
-        }
-
         const user = await this.prisma.user.findUnique({
             where: { email },
             select: { id: true, isVerify: true }
         });
 
-        if (user && !user.isVerify) {
-            const code = Math.floor(100000 + Math.random() * 900000).toString();
+        if (!user) throw new BadRequestException('Пользователь не найден');
 
-            await this.redisService.setKey(`otp:${email}`, code, 600);
+        if (user.isVerify) throw new BadRequestException('Аккаунт уже подтверждён');
 
-            await this.redisService.setKey(cooldownKey, '1', 60);
+        const cooldownKey = `otp:cooldown:${user.id}`;
+        const onCooldown = await this.redisService.getKey(cooldownKey);
+        
+        if (onCooldown) return { message: 'Код уже был отправлен. Пожалуйста, подождите перед повторным запросом.' };
 
-            const fromEmail = this.configService.get<string>('EMAIL_HOST_USER');
-            const message = `<h2>Ваш код подтверждения</h2>
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+        await this.redisService.setKey(`otp:${user.id}`, code, 600);
+        await this.redisService.setKey(cooldownKey, '1', 60);
+
+        const fromEmail = this.configService.get<string>('EMAIL_HOST_USER');
+        const message = `<h2>Ваш код подтверждения</h2>
                 <p>Введите этот код для подтверждения аккаунта: <strong>${code}</strong></p>
                 <p>Срок действия кода — 10 минут.</p>`;
 
-            await this.mailService.sendMail({
-                from: fromEmail,
-                to: email,
-                subject: 'Код подтверждения аккаунта',
-                html: message,
-            });
-        }
-
-        return { message: 'If this email is registered, a verification code has been sent.' };
-    }
-
-
-    public async verify(email: string, code: string) {
-        const otp = await this.redisService.getKey(`otp:${email}`);
-
-        if (!otp || otp !== code) {
-            throw new BadRequestException('Invalid or expired code');
-        }
-
-        const user = await this.prisma.user.findUnique({
-            where: { email },
-            select: { id: true, isVerify: true }
+        await this.mailService.sendMail({
+            from: fromEmail,
+            to: email,
+            subject: 'Код подтверждения аккаунта',
+            html: message,
         });
 
-        if (!user) {
-            throw new BadRequestException('User not found');
-        }
+        return { message: 'Код подтверждения был отправлен на вашу почту' };
+    }
 
-        if (user.isVerify) {
-            throw new BadRequestException('Account already verified');
-        }
+    public async verify(login: string, code: string) {
+        const user = await this.prisma.user.findFirst({
+            where: {
+                OR: [
+                    { email: login },
+                    { phone: login }
+                ]
+            }
+        });
+
+        if (!user) throw new BadRequestException('Пользователь не найден');
+        if (user.isVerify) throw new BadRequestException('Аккаунт уже подтверждён');
+
+        const otp = await this.redisService.getKey(`otp:${user.id}`);
+        if (!otp || otp !== code) throw new BadRequestException('Неверный или просроченный код');
 
         await this.prisma.user.update({
-            where: { email },
+            where: { id: user.id },
             data: { isVerify: true }
         });
 
-        await this.redisService.deleteKey(`otp:${email}`);
+        await this.redisService.deleteKey(`otp:${user.id}`);
 
         const accessToken = await this.generateAccessToken(user.id);
         const refreshToken = await this.generateRefreshToken(user.id);
 
         return {
-            message: 'Account has been verified',
+            message: 'Аккаунт успешно подтверждён',
             tokens: {
                 accessToken,
                 refreshToken,
@@ -165,24 +155,17 @@ export class AuthService {
             }
         });
 
-        if (!user) {
-            throw new UnauthorizedException('Invalid credentials');
-        }
-
-        if (!user.isVerify) {
-            throw new UnauthorizedException('Account is not verified');
-        }
+        if (!user) throw new UnauthorizedException('Неверные учетные данные');
+        if (!user.isVerify) throw new UnauthorizedException('Аккаунт не подтверждён');
 
         const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-        if (!isPasswordValid) {
-            throw new UnauthorizedException('Invalid email or password');
-        }
+        if (!isPasswordValid) throw new UnauthorizedException('Неверный логин или пароль');
 
         const accessToken = await this.generateAccessToken(user.id);
         const refreshToken = await this.generateRefreshToken(user.id);
 
         return {
-            message: 'Signed in successfully',
+            message: 'Вход выполнен успешно',
             tokens: {
                 accessToken,
                 refreshToken
@@ -194,65 +177,55 @@ export class AuthService {
         try {
             const payload = await this.jwtService.verifyAsync(refreshToken);
 
-            if (payload.type !== "refresh") throw new UnauthorizedException('Invalid token type');
+            if (payload.type !== "refresh") throw new UnauthorizedException('Неверный тип токена');
 
             const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
-            if (!user) throw new UnauthorizedException('User not found');
+            if (!user) throw new UnauthorizedException('Пользователь не найден');
 
             const newAccessToken = await this.generateAccessToken(payload.sub);
             const newRefreshToken = await this.generateRefreshToken(payload.sub);
 
             return { newAccessToken, newRefreshToken };
 
-        } catch (error) {
-            throw new UnauthorizedException('Invalid refresh token');
+        } catch {
+            throw new UnauthorizedException('Недействительный refresh-токен');
         }
     }
 
     public async forgotPassword(email: string) {
         const user = await this.prisma.user.findUnique({ where: { email }, select: { id: true } });
 
+        if (!user) throw new BadRequestException('Пользователь не найден');
+
         const cooldownKey = `fp:cooldown:${email}`;
         const onCooldown = await this.redisService.getKey(cooldownKey);
-        if (onCooldown) {
-            return { message: 'If this email is registered, a reset code has been sent.' };
-        }
+        if (onCooldown) return { message: 'Код уже был отправлен. Пожалуйста, подождите перед повторным запросом.' };
 
-        if (user) {
-            const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
 
-            await this.redisService.setKey(`fp:${email}`, code, 600);
-            await this.redisService.setKey(cooldownKey, '1', 60);
+        await this.redisService.setKey(`fp:${email}`, code, 600);
+        await this.redisService.setKey(cooldownKey, '1', 60);
 
-            const fromEmail = this.configService.get<string>('EMAIL_HOST_USER');
-            const html = `
-                <h2>Восстановление пароля</h2>
-                <p>Ваш код для сброса пароля: <strong>${code}</strong></p>
-                <p>Срок действия кода — 10 минут.</p>
-            `;
+        const fromEmail = this.configService.get<string>('EMAIL_HOST_USER');
+        const html = `
+            <h2>Восстановление пароля</h2>
+            <p>Ваш код для сброса пароля: <strong>${code}</strong></p>
+            <p>Срок действия кода — 10 минут.</p>
+        `;
 
-            await this.mailService.sendMail({
-                from: fromEmail,
-                to: email,
-                subject: 'Код для восстановления пароля',
-                html,
-            });
-        }
+        await this.mailService.sendMail({
+            from: fromEmail,
+            to: email,
+            subject: 'Код для восстановления пароля',
+            html,
+        });
 
-        return { message: 'If this email is registered, a reset code has been sent.' };
+        return { message: 'Код для восстановления пароля был отправлен на вашу почту' };
     }
 
     public async restorePassword(email: string, code: string, newPassword: string) {
         const saved = await this.redisService.getKey(`fp:${email}`);
-        if (!saved || saved !== code) {
-            throw new BadRequestException('Invalid or expired code');
-        }
-
-        const user = await this.prisma.user.findUnique({ where: { email }, select: { id: true } });
-        if (!user) {
-            await this.redisService.deleteKey(`fp:${email}`);
-            throw new BadRequestException('Invalid or expired code');
-        }
+        if (!saved || saved !== code) throw new BadRequestException('Неверный или просроченный код');
 
         const passwordHash = await bcrypt.hash(newPassword, 10);
 
@@ -262,17 +235,42 @@ export class AuthService {
         });
 
         await this.redisService.deleteKey(`fp:${email}`);
+        await this.redisService.deleteKey(`fp:cooldown:${email}`);
 
-        return { message: 'Password has been reset successfully' };
+        return { message: 'Пароль успешно сброшен' };
     }
 
     public async tokenVerify(token: string) {
         try {
             await this.jwtService.verifyAsync(token);
-        } catch (err) {
+        } catch {
             throw new UnauthorizedException('Invalid or expired token');
         }
 
         return { detail: 'Token is valid' };
+    }
+
+    public async isUsernameAvailable(username: string): Promise<boolean> {
+        const existing = await this.prisma.user.findFirst({
+            where: { username: { equals: username, mode: 'insensitive' } },
+            select: { id: true },
+        });
+        return !existing;
+    }
+
+    public async isPhoneAvailable(phone: string): Promise<boolean> {
+        const existing = await this.prisma.user.findFirst({
+            where: { phone: { equals: phone, mode: 'insensitive' } },
+            select: { id: true },
+        });
+        return !existing;
+    }
+
+    public async isEmailAvailable(email: string): Promise<boolean> {
+        const existing = await this.prisma.user.findFirst({
+            where: { email: { equals: email, mode: 'insensitive' } },
+            select: { id: true },
+        });
+        return !existing;
     }
 }

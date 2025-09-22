@@ -265,14 +265,6 @@ export class UsersController {
         return this.usersService.getFollowingOfUser(request.userId, id, cursor, limit);
     }
 
-    @Get('check-username')
-    @UseGuards()
-    @ApiQuery({ name: 'username', required: true, type: String })
-    async checkUsername(@Query('username') username: string) {
-        const available = await this.usersService.isUsernameAvailable(username);
-        return { available };
-    }
-
     @Post('close-friends/:id')
     async addToCloseFriends(
         @Req() request: RequestWithAuth,

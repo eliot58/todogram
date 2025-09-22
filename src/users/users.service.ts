@@ -704,16 +704,6 @@ export class UsersService {
         return { items, nextCursor };
     }
 
-
-    async isUsernameAvailable(username: string): Promise<boolean> {
-        const existing = await this.prisma.user.findFirst({
-            where: { username: { equals: username, mode: 'insensitive' } },
-            select: { id: true },
-        });
-        return !existing;
-    }
-
-
     async addToCloseFriends(ownerId: number, friendId: number) {
         const friend = await this.prisma.user.findUnique({ where: { id: friendId }, select: { id: true } });
         if (!friend) throw new NotFoundException('User not found');

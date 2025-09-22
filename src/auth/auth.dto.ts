@@ -30,8 +30,8 @@ export class SignupDto {
 
 export class VerifyDto {
   @ApiProperty()
-  @IsEmail()
-  email: string;
+  @IsString()
+  login: string;
 
   @ApiProperty()
   @IsString()

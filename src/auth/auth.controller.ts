@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ForgotPasswordDto, RefreshTokenDto, ResendVerifyDto, RestorePasswordDto, SigninDto, SignupDto, TokenVerifyDto, VerifyDto } from './auth.dto';
 
@@ -18,7 +18,7 @@ export class AuthController {
 
     @Post('verify')
     async verify(@Body() dto: VerifyDto) {
-        return await this.authService.verify(dto.email, dto.code);
+        return await this.authService.verify(dto.login, dto.code);
     }
 
     @Post('signin')
@@ -44,5 +44,23 @@ export class AuthController {
     @Post('token/verify')
     async tokenVerify(@Body() dto: TokenVerifyDto) {
         return await this.authService.tokenVerify(dto.token);
+    }
+
+    @Get('check-username')
+    async checkUsername(@Query('username') username: string) {
+        const available = await this.authService.isUsernameAvailable(username);
+        return { available };
+    }
+
+    @Get('check-phone')
+    async checkPhone(@Query('phone') phone: string) {
+        const available = await this.authService.isPhoneAvailable(phone);
+        return { available };
+    }
+
+    @Get('check-email')
+    async checkEmail(@Query('email') email: string) {
+        const available = await this.authService.isEmailAvailable(email);
+        return { available };
     }
 }
