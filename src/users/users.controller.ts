@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequestWithAuth } from '../auth/auth.types';
@@ -65,6 +65,11 @@ export class UsersController {
     @Patch('me/privacy/toggle')
     async togglePrivacy(@Req() request: RequestWithAuth) {
         return this.usersService.togglePrivacy(request.userId);
+    }
+
+    @Patch('me/notify/toggle')
+    async toggleNotify(@Req() request: RequestWithAuth) {
+        return this.usersService.toggleNotify(request.userId);
     }
 
     @Post(':id/follow')
@@ -153,7 +158,7 @@ export class UsersController {
         @Query('limit') limit: number = 20,
     ) {
         return this.usersService.getUserPublications(request.userId, request.userId, {
-            isReels: false,
+            isReels: undefined,
             cursor,
             limit,
         });
@@ -184,7 +189,7 @@ export class UsersController {
         @Query('limit') limit: number = 20,
     ) {
         return this.usersService.getUserPublications(request.userId, id, {
-            isReels: false,
+            isReels: undefined,
             cursor,
             limit,
         });
@@ -265,24 +270,21 @@ export class UsersController {
         return this.usersService.getFollowingOfUser(request.userId, id, cursor, limit);
     }
 
-    @Post('close-friends/:id')
-    async addToCloseFriends(
+    @Post('close-friends')
+    @ApiBody({ schema: { properties: { ids: { type: 'array', items: { type: 'number' } } } } })
+    async addManyToCloseFriends(
         @Req() request: RequestWithAuth,
-        @Param('id') id: number,
+        @Body() body: { ids: number[] },
     ) {
-        if (request.userId === id) {
-            throw new BadRequestException('Нельзя добавить самого себя в близкие друзья');
-        }
-
-        return this.usersService.addToCloseFriends(request.userId, id);
+        return this.usersService.addManyToCloseFriends(request.userId, body.ids);
     }
-
-    @Delete('close-friends/:id')
-    async removeFromCloseFriends(
+    
+    @Delete('close-friends')
+    async removeManyFromCloseFriends(
         @Req() request: RequestWithAuth,
-        @Param('id') id: number,
+        @Body() body: { ids: number[] },
     ) {
-        return this.usersService.removeFromCloseFriends(request.userId, id);
+        return this.usersService.removeManyFromCloseFriends(request.userId, body.ids);
     }
 
     @Get('me/close-friends')
@@ -294,5 +296,35 @@ export class UsersController {
         @Query('limit') limit: number = 20,
     ) {
         return this.usersService.getMyCloseFriends(request.userId, cursor, limit);
+    }
+
+    @Post('blocked/:id')
+    async addToBlocked(
+        @Req() request: RequestWithAuth,
+        @Param('id') id: number,
+    ) {
+        if (request.userId === id) {
+            throw new BadRequestException('Нельзя заблокировать самого себя');
+        }
+        return this.usersService.blockUser(request.userId, id);
+    }
+
+    @Delete('blocked/:id')
+    async removeFromBlocked(
+        @Req() request: RequestWithAuth,
+        @Param('id') id: number,
+    ) {
+        return this.usersService.unblockUser(request.userId, id);
+    }
+
+    @Get('me/blocked')
+    @ApiQuery({ name: 'cursor', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    async getMyBlocked(
+        @Req() request: RequestWithAuth,
+        @Query('cursor') cursor?: number,
+        @Query('limit') limit: number = 20,
+    ) {
+        return this.usersService.getMyBlocked(request.userId, cursor, limit);
     }
 }

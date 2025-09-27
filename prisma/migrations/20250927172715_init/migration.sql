@@ -13,11 +13,14 @@ CREATE TABLE "public"."User" (
     "avatarUrl" TEXT,
     "isVerify" BOOLEAN NOT NULL DEFAULT false,
     "isPrivate" BOOLEAN NOT NULL DEFAULT false,
+    "notify" BOOLEAN NOT NULL DEFAULT true,
     "verifiedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "followersCount" INTEGER NOT NULL DEFAULT 0,
     "followingCount" INTEGER NOT NULL DEFAULT 0,
     "postCount" INTEGER NOT NULL DEFAULT 0,
+    "blockedCount" INTEGER NOT NULL DEFAULT 0,
+    "closeFriendsCount" INTEGER NOT NULL DEFAULT 0,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
@@ -55,6 +58,16 @@ CREATE TABLE "public"."CloseFriend" (
 );
 
 -- CreateTable
+CREATE TABLE "public"."Block" (
+    "id" SERIAL NOT NULL,
+    "blockerId" INTEGER NOT NULL,
+    "blockedId" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Block_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "public"."Post" (
     "id" SERIAL NOT NULL,
     "caption" TEXT,
@@ -67,6 +80,7 @@ CREATE TABLE "public"."Post" (
     "likesCount" INTEGER NOT NULL DEFAULT 0,
     "commentsCount" INTEGER NOT NULL DEFAULT 0,
     "savedCount" INTEGER NOT NULL DEFAULT 0,
+    "viewsCount" INTEGER NOT NULL DEFAULT 0,
 
     CONSTRAINT "Post_pkey" PRIMARY KEY ("id")
 );
@@ -181,6 +195,15 @@ CREATE INDEX "CloseFriend_friendId_createdAt_idx" ON "public"."CloseFriend"("fri
 CREATE UNIQUE INDEX "CloseFriend_ownerId_friendId_key" ON "public"."CloseFriend"("ownerId", "friendId");
 
 -- CreateIndex
+CREATE INDEX "Block_blockerId_createdAt_idx" ON "public"."Block"("blockerId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "Block_blockedId_createdAt_idx" ON "public"."Block"("blockedId", "createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Block_blockerId_blockedId_key" ON "public"."Block"("blockerId", "blockedId");
+
+-- CreateIndex
 CREATE INDEX "Post_isReels_id_idx" ON "public"."Post"("isReels", "id");
 
 -- CreateIndex
@@ -254,6 +277,12 @@ ALTER TABLE "public"."CloseFriend" ADD CONSTRAINT "CloseFriend_ownerId_fkey" FOR
 
 -- AddForeignKey
 ALTER TABLE "public"."CloseFriend" ADD CONSTRAINT "CloseFriend_friendId_fkey" FOREIGN KEY ("friendId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Block" ADD CONSTRAINT "Block_blockerId_fkey" FOREIGN KEY ("blockerId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Block" ADD CONSTRAINT "Block_blockedId_fkey" FOREIGN KEY ("blockedId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."Post" ADD CONSTRAINT "Post_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

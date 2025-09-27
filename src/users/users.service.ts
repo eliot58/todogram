@@ -21,6 +21,7 @@ export class UsersService {
                 avatarUrl: true,
                 isVerify: true,
                 isPrivate: true,
+                notify: true,
                 createdAt: true,
             },
         });
@@ -81,6 +82,22 @@ export class UsersService {
             where: { id: userId },
             data: { isPrivate: !current.isPrivate },
             select: { isPrivate: true },
+        });
+
+        return updated;
+    }
+
+    async toggleNotify(userId: number) {
+        const current = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { notify: true },
+        });
+        if (!current) throw new NotFoundException('User not found');
+
+        const updated = await this.prisma.user.update({
+            where: { id: userId },
+            data: { notify: !current.notify },
+            select: { notify: true },
         });
 
         return updated;
@@ -307,7 +324,7 @@ export class UsersService {
     async getUserPublications(
         viewerId: number,
         targetId: number,
-        { isReels, cursor, limit }: { isReels: boolean; cursor?: number; limit?: number }
+        { isReels, cursor, limit }: { isReels: boolean | undefined; cursor?: number; limit?: number }
     ) {
         const exists = await this.prisma.user.findUnique({
             where: { id: targetId },
@@ -315,7 +332,7 @@ export class UsersService {
         });
         if (!exists) throw new NotFoundException('User not found');
 
-        if (exists.isPrivate) throw new ForbiddenException('User isPrivate');
+        if (viewerId !== targetId && exists.isPrivate) throw new ForbiddenException('User isPrivate');
 
         const take = Math.min(Math.max(limit || 20, 1), 100);
 
@@ -704,26 +721,232 @@ export class UsersService {
         return { items, nextCursor };
     }
 
-    async addToCloseFriends(ownerId: number, friendId: number) {
-        const friend = await this.prisma.user.findUnique({ where: { id: friendId }, select: { id: true } });
-        if (!friend) throw new NotFoundException('User not found');
+    async addManyToCloseFriends(ownerId: number, friendIds: number[]) {
+        if (!Array.isArray(friendIds) || friendIds.length === 0) {
+            throw new BadRequestException('ids пустой');
+        }
 
-        try {
-            const item = await this.prisma.closeFriend.create({
-                data: { ownerId, friendId },
-                include: {
-                    friend: {
-                        select: { id: true, username: true, fullName: true, avatarUrl: true, isPrivate: true, isVerify: true },
+        // убираем дубли/самого себя
+        const uniqueIds = [...new Set(friendIds)].filter((id) => id !== ownerId);
+
+        if (uniqueIds.length === 0) {
+            throw new BadRequestException('Нечего добавлять');
+        }
+
+        // проверяем, что такие пользователи существуют
+        const existing = await this.prisma.user.findMany({
+            where: { id: { in: uniqueIds } },
+            select: { id: true },
+        });
+        const existingIds = new Set(existing.map((u) => u.id));
+        const toInsert = uniqueIds.filter((id) => existingIds.has(id));
+
+        if (toInsert.length === 0) {
+            throw new NotFoundException('Пользователи не найдены');
+        }
+
+        // транзакция: createMany(skipDuplicates) + инкремент на созданное кол-во
+        const { createdCount } = await this.prisma.$transaction(async (tx) => {
+            const created = await tx.closeFriend.createMany({
+                data: toInsert.map((friendId) => ({ ownerId, friendId })),
+                skipDuplicates: true,
+            });
+
+            if (created.count > 0) {
+                await tx.user.update({
+                    where: { id: ownerId },
+                    data: { closeFriendsCount: { increment: created.count } },
+                });
+            }
+
+            return { createdCount: created.count };
+        });
+
+        const items = await this.prisma.user.findMany({
+            where: { id: { in: toInsert } },
+            select: {
+                id: true,
+                username: true,
+                fullName: true,
+                avatarUrl: true,
+                isPrivate: true,
+                isVerify: true,
+            },
+        });
+
+        return {
+            ok: true,
+            created: createdCount,
+            requested: uniqueIds.length,
+            items,
+        };
+    }
+
+    // ---- BULK REMOVE ----
+    async removeManyFromCloseFriends(ownerId: number, friendIds: number[]) {
+        if (!Array.isArray(friendIds) || friendIds.length === 0) {
+            throw new BadRequestException('ids пустой');
+        }
+
+        const uniqueIds = [...new Set(friendIds)].filter((id) => id !== ownerId);
+        if (uniqueIds.length === 0) {
+            return { ok: true, removed: 0 };
+        }
+
+        const { removedCount } = await this.prisma.$transaction(async (tx) => {
+            const del = await tx.closeFriend.deleteMany({
+                where: { ownerId, friendId: { in: uniqueIds } },
+            });
+
+            if (del.count > 0) {
+                await tx.user.update({
+                    where: { id: ownerId },
+                    data: { closeFriendsCount: { decrement: del.count } },
+                });
+            }
+
+            return { removedCount: del.count };
+        });
+
+        return { ok: true, removed: removedCount };
+    }
+
+    async getMyCloseFriends(viewerId: number, cursor?: number, limit: number = 20) {
+        const take = Math.min(Math.max(limit || 20, 1), 100);
+
+        const rows = await this.prisma.follower.findMany({
+            where: { followerId: viewerId },
+            orderBy: { id: 'desc' },
+            cursor: cursor ? { id: cursor } : undefined,
+            skip: cursor ? 1 : 0,
+            take,
+            include: {
+                following: {
+                    select: {
+                        id: true,
+                        username: true,
+                        fullName: true,
+                        avatarUrl: true,
+                        isPrivate: true,
+                        isVerify: true,
+                        _count: {
+                            select: {
+                                inCloseFriendsOf: { where: { ownerId: viewerId } },
+                            },
+                        },
                     },
                 },
+            },
+        });
+
+        const items = rows.map(r => ({
+            id: r.following.id,
+            username: r.following.username,
+            fullName: r.following.fullName,
+            avatarUrl: r.following.avatarUrl,
+            isPrivate: r.following.isPrivate,
+            isVerify: r.following.isVerify,
+            isCloseFriend: r.following._count.inCloseFriendsOf > 0,
+        }));
+
+        const nextCursor = rows.length === take ? rows[rows.length - 1].id : null;
+        return { items, nextCursor };
+    }
+
+    async blockUser(ownerId: number, targetId: number) {
+        const target = await this.prisma.user.findUnique({
+            where: { id: targetId },
+            select: { id: true },
+        });
+        if (!target) throw new NotFoundException('User not found');
+
+        try {
+            const item = await this.prisma.$transaction(async (tx) => {
+                const created = await tx.block.create({
+                    data: { blockerId: ownerId, blockedId: targetId },
+                    include: {
+                        blocked: {
+                            select: {
+                                id: true,
+                                username: true,
+                                fullName: true,
+                                avatarUrl: true,
+                                isPrivate: true,
+                                isVerify: true,
+                            },
+                        },
+                    },
+                });
+
+                const delOwnerFollowing = await tx.follower.deleteMany({
+                    where: { followerId: ownerId, followingId: targetId },
+                });
+                if (delOwnerFollowing.count > 0) {
+                    await tx.user.update({
+                        where: { id: ownerId },
+                        data: { followingCount: { decrement: delOwnerFollowing.count } },
+                    });
+                    await tx.user.update({
+                        where: { id: targetId },
+                        data: { followersCount: { decrement: delOwnerFollowing.count } },
+                    });
+                }
+
+                const delTargetFollowing = await tx.follower.deleteMany({
+                    where: { followerId: targetId, followingId: ownerId },
+                });
+                if (delTargetFollowing.count > 0) {
+                    await tx.user.update({
+                        where: { id: targetId },
+                        data: { followingCount: { decrement: delTargetFollowing.count } },
+                    });
+                    await tx.user.update({
+                        where: { id: ownerId },
+                        data: { followersCount: { decrement: delTargetFollowing.count } },
+                    });
+                }
+
+                await tx.user.update({
+                    where: { id: ownerId },
+                    data: { blockedCount: { increment: 1 } },
+                });
+
+                await tx.followRequest.deleteMany({
+                    where: {
+                        OR: [
+                            { requesterId: ownerId, targetId },
+                            { requesterId: targetId, targetId: ownerId },
+                        ],
+                    },
+                });
+                await tx.closeFriend.deleteMany({
+                    where: {
+                        OR: [
+                            { ownerId: ownerId, friendId: targetId },
+                            { ownerId: targetId, friendId: ownerId },
+                        ],
+                    },
+                });
+
+                return created;
             });
+
             return { ok: true, item };
         } catch (e) {
             if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-                const item = await this.prisma.closeFriend.findUnique({
-                    where: { ownerId_friendId: { ownerId, friendId } },
+                const item = await this.prisma.block.findUnique({
+                    where: { blockerId_blockedId: { blockerId: ownerId, blockedId: targetId } },
                     include: {
-                        friend: { select: { id: true, username: true, fullName: true, avatarUrl: true, isPrivate: true, isVerify: true } },
+                        blocked: {
+                            select: {
+                                id: true,
+                                username: true,
+                                fullName: true,
+                                avatarUrl: true,
+                                isPrivate: true,
+                                isVerify: true,
+                            },
+                        },
                     },
                 });
                 return { ok: true, item };
@@ -732,53 +955,55 @@ export class UsersService {
         }
     }
 
-    async removeFromCloseFriends(ownerId: number, friendId: number) {
-        const exists = await this.prisma.closeFriend.findUnique({
-            where: { ownerId_friendId: { ownerId, friendId } },
+    async unblockUser(ownerId: number, targetId: number) {
+        const exists = await this.prisma.block.findUnique({
+            where: { blockerId_blockedId: { blockerId: ownerId, blockedId: targetId } },
             select: { id: true },
         });
 
         if (!exists) return { ok: true, removed: false };
 
-        await this.prisma.closeFriend.delete({
-            where: { ownerId_friendId: { ownerId, friendId } },
+        await this.prisma.$transaction(async (tx) => {
+            await tx.block.delete({ where: { blockerId_blockedId: { blockerId: ownerId, blockedId: targetId } } });
+            await tx.user.update({ where: { id: ownerId }, data: { blockedCount: { decrement: 1 } } });
         });
 
         return { ok: true, removed: true };
     }
 
-    async getMyCloseFriends(viewerId: number, cursor?: number, limit: number = 20) {
+    async getMyBlocked(viewerId: number, cursor?: number, limit: number = 20) {
         const take = Math.min(Math.max(limit || 20, 1), 100);
 
-        const rows = await this.prisma.closeFriend.findMany({
-            where: { ownerId: viewerId },
+        const rows = await this.prisma.block.findMany({
+            where: { blockerId: viewerId },
             orderBy: { id: 'desc' },
             cursor: cursor ? { id: cursor } : undefined,
             skip: cursor ? 1 : 0,
             take,
             include: {
-                friend: {
+                blocked: {
                     select: {
                         id: true,
                         username: true,
                         fullName: true,
                         avatarUrl: true,
+                        isPrivate: true,
+                        isVerify: true,
                     },
                 },
             },
         });
 
-        const items = rows.map(({ friend }) => ({
-            id: friend.id,
-            username: friend.username,
-            fullName: friend.fullName,
-            avatarUrl: friend.avatarUrl,
+        const items = rows.map(({ blocked }) => ({
+            id: blocked.id,
+            username: blocked.username,
+            fullName: blocked.fullName,
+            avatarUrl: blocked.avatarUrl,
+            isPrivate: blocked.isPrivate,
+            isVerify: blocked.isVerify,
         }));
 
         const nextCursor = rows.length === take ? rows[rows.length - 1].id : null;
-
         return { items, nextCursor };
     }
-
-
 }

@@ -25,12 +25,16 @@ model User {
   avatarUrl      String?
   isVerify       Boolean   @default(false)
   isPrivate      Boolean   @default(false)
+  notify         Boolean   @default(true)
   verifiedAt     DateTime?
   createdAt      DateTime  @default(now())
 
   followersCount   Int     @default(0)
   followingCount   Int     @default(0)
   postCount        Int     @default(0)
+
+  blockedCount       Int   @default(0)
+  closeFriendsCount  Int   @default(0)
 
   posts          Post[]
   stories        Story[]
@@ -47,6 +51,9 @@ model User {
 
   incomingFollowRequests FollowRequest[] @relation("FollowRequestsIncoming")
   outgoingFollowRequests FollowRequest[] @relation("FollowRequestsOutgoing")
+
+  blockedUsers    Block[] @relation("UserBlocksOwner")
+  blockedByOthers Block[] @relation("UserBlocksMember")
 }
 
 enum FollowRequestStatus {
@@ -96,6 +103,19 @@ model CloseFriend {
   @@index([friendId, createdAt])
 }
 
+model Block {
+  id         Int      @id @default(autoincrement())
+  blocker    User     @relation("UserBlocksOwner",  fields: [blockerId], references: [id], onDelete: Cascade)
+  blockerId  Int
+  blocked    User     @relation("UserBlocksMember", fields: [blockedId], references: [id], onDelete: Cascade)
+  blockedId  Int
+  createdAt  DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId, createdAt])
+  @@index([blockedId, createdAt])
+}
+
 model Post {
   id          Int         @id @default(autoincrement())
   caption     String?
@@ -112,10 +132,11 @@ model Post {
   comments    Comment[]
   savedBy     SavedPost[]
 
-  shareCount  Int         @default(0)
-  likesCount     Int        @default(0)
-  commentsCount  Int        @default(0)
-  savedCount     Int        @default(0)
+  shareCount     Int      @default(0)
+  likesCount     Int      @default(0)
+  commentsCount  Int      @default(0)
+  savedCount     Int      @default(0)
+  viewsCount     Int      @default(0)
 
   @@index([isReels, id])
   @@index([userId, createdAt])

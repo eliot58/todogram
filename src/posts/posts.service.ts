@@ -116,7 +116,7 @@ export class PostsService {
         return { message: 'Deleted' };
     }
 
-    async getAllPosts(viewerId: number, { isReels, cursor, limit }: { isReels: boolean; cursor?: number; limit?: number }) {
+    async getAllPosts(viewerId: number, { isReels, cursor, limit }: { isReels: boolean | undefined; cursor?: number; limit?: number }) {
         const take = Math.min(Math.max(limit || 20, 1), 100);
 
         const posts = await this.prisma.post.findMany({
