@@ -121,7 +121,11 @@ export class PostsService {
 
         const posts = await this.prisma.post.findMany({
             where: {
-                user: { isPrivate: false },
+                user: { 
+                    isPrivate: false,
+                    blockedByOthers: { none: { blockerId: viewerId } },
+                    blockedUsers: { none: { blockedId: viewerId } },
+                },
                 userId: { not: viewerId }, 
                 isReels
             },
@@ -140,6 +144,7 @@ export class PostsService {
                 commentsCount: true,
                 savedCount: true,
                 shareCount: true,
+                viewsCount: true,
                 images: { orderBy: { position: 'asc' }, select: { id: true, url: true, position: true, createdAt: true } },
                 user: {
                     select: {
@@ -181,6 +186,7 @@ export class PostsService {
                     comments: p.commentsCount,
                     saved: p.savedCount,
                     shared: p.shareCount,
+                    viewed: p.viewsCount
                 },
                 liked: p.likes.length > 0,
                 saved: p.savedBy.length > 0,

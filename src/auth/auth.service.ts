@@ -1,12 +1,12 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { AccessPayload, RefreshPayload } from './jwt.interface';
 import { JwtService } from '@nestjs/jwt';
-import { ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS } from '../constants/auth.constants';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { RedisService } from '../redis/redis.service';
 import { MailerService } from '@nestjs-modules/mailer';
-import { ConfigService } from '@nestjs/config';
+import { ConfigType } from '@nestjs/config';
+import appConfig from '../config/app.config';
 
 @Injectable()
 export class AuthService {
@@ -15,20 +15,20 @@ export class AuthService {
         private readonly prisma: PrismaService,
         private readonly redisService: RedisService,
         private readonly mailService: MailerService,
-        private readonly configService: ConfigService,
+        @Inject(appConfig.KEY) private readonly appCfg: ConfigType<typeof appConfig>
     ) { }
 
     public async generateAccessToken(userId: number): Promise<string> {
         const payload: AccessPayload = { sub: userId, type: "access" };
         return await this.jwtService.signAsync(payload, {
-            expiresIn: ACCESS_TOKEN_EXPIRE_MINUTES,
+            expiresIn: this.appCfg.access_token_expire,
         });
     }
 
     public async generateRefreshToken(userId: number): Promise<string> {
         const payload: RefreshPayload = { sub: userId, type: "refresh" };
         return await this.jwtService.signAsync(payload, {
-            expiresIn: REFRESH_TOKEN_EXPIRE_DAYS,
+            expiresIn: this.appCfg.refresh_token_expire,
         });
     }
 
@@ -57,7 +57,7 @@ export class AuthService {
         await this.redisService.setKey(`otp:${newUser.id}`, code, 600);
         await this.redisService.setKey(cooldownKey, '1', 60);
 
-        const fromEmail = this.configService.get<string>('EMAIL_HOST_USER');
+        const fromEmail = this.appCfg.email_host_user;
 
         const message = `<h2>Ваш код подтверждения</h2>
             <p>Введите этот код для подтверждения аккаунта: <strong>${code}</strong></p>
@@ -98,7 +98,7 @@ export class AuthService {
         await this.redisService.setKey(`otp:${user.id}`, code, 600);
         await this.redisService.setKey(cooldownKey, '1', 60);
 
-        const fromEmail = this.configService.get<string>('EMAIL_HOST_USER');
+        const fromEmail = this.appCfg.email_host_user;
         const message = `<h2>Ваш код подтверждения</h2>
                 <p>Введите этот код для подтверждения аккаунта: <strong>${code}</strong></p>
                 <p>Срок действия кода — 10 минут.</p>`;
@@ -213,7 +213,7 @@ export class AuthService {
         await this.redisService.setKey(`fp:${email}`, code, 600);
         await this.redisService.setKey(cooldownKey, '1', 60);
 
-        const fromEmail = this.configService.get<string>('EMAIL_HOST_USER');
+        const fromEmail = this.appCfg.email_host_user;
         const html = `
             <h2>Восстановление пароля</h2>
             <p>Ваш код для сброса пароля: <strong>${code}</strong></p>

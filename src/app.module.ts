@@ -1,54 +1,47 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule, ConfigService, ConfigType } from '@nestjs/config';
 import { SentryModule } from '@sentry/nestjs/setup';
 import { APP_FILTER } from '@nestjs/core';
 import { SentryGlobalFilter } from '@sentry/nestjs/setup';
 import { LoggerModule } from 'nestjs-pino';
 import { AuthModule } from './auth/auth.module';
-import { UsersModule } from './users/users.module';
 import { PostsModule } from './posts/posts.module';
 import { StoriesModule } from './stories/stories.module';
-import { PrismaModule } from './prisma/prisma.module';
 import { MailerModule } from '@nestjs-modules/mailer';
-import { RedisModule } from './redis/redis.module';
-import { S3Module } from './s3/s3.module';
 import { ChatModule } from './chat/chat.module';
+import { UsersRouterModule } from './users/users.router.module';
+import appConfig from './config/app.config';
 
 @Module({
   imports: [
     SentryModule.forRoot(),
     ConfigModule.forRoot({
-      isGlobal: true
+      isGlobal: true,
+      cache: true,
+      load: [appConfig]
     }),
     // LoggerModule.forRoot(),
     MailerModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        const user = config.get<string>('EMAIL_HOST_USER');
-        const pass = config.get<string>('EMAIL_HOST_PASSWORD');
-        
+      inject: [appConfig.KEY],
+      useFactory: (appCfg: ConfigType<typeof appConfig>) => {
         return {
           transport: {
             host: 'smtp.mail.ru',
             port: 587,
             secure: false,
             auth: {
-              user,
-              pass,
+              user: appCfg.email_host_user,
+              pass: appCfg.email_host_password,
             }
           },
         };
       }
     }),
     AuthModule,
-    UsersModule,
+    UsersRouterModule,
     PostsModule,
     StoriesModule,
-    PrismaModule,
-    RedisModule,
-    S3Module,
     ChatModule,
   ],
   controllers: [AppController],

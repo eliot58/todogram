@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Delete, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { RequestWithAuth } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { isImage, isVideo } from '../helper/mime';

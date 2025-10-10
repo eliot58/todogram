@@ -1,22 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { v4 as uuid } from 'uuid';
+import { ConfigType } from '@nestjs/config';
+import appConfig from '../config/app.config';
 
 @Injectable()
 export class S3Service {
-    private s3: S3Client;
-
-    constructor() {
-        this.s3 = new S3Client({
-            credentials: {
-                accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-                secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-            },
-            endpoint: 'https://s3.twcstorage.ru',
-            forcePathStyle: true,
-            region: 'ru-1',
-        });
-    }
+    constructor(
+        @Inject('S3_CLIENT') private readonly s3: S3Client,
+        @Inject(appConfig.KEY) private readonly appCfg: ConfigType<typeof appConfig>,
+    ) { }
 
     async uploadBuffer(
         fileBuffer: Buffer,
@@ -27,13 +20,13 @@ export class S3Service {
 
         await this.s3.send(
             new PutObjectCommand({
-                Bucket: process.env.AWS_S3_BUCKET!,
+                Bucket: this.appCfg.aws_s3_bucket,
                 Key: key,
                 Body: fileBuffer,
                 ContentType: mimeType,
             })
         );
 
-        return `https://s3.twcstorage.ru/${process.env.AWS_S3_BUCKET}/${key}`;
+        return `https://s3.twcstorage.ru/${this.appCfg.aws_s3_bucket}/${key}`;
     }
 }
