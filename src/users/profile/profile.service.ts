@@ -17,7 +17,7 @@ export class ProfileService {
                 followersCount: true,
                 followingCount: true,
                 blockedCount: true,
-                closeFriends: true,
+                closeFriendsCount: true,
                 postCount: true,
                 avatarUrl: true,
                 isVerify: true,
