@@ -15,36 +15,36 @@ datasource db {
 }
 
 model User {
-  id             Int       @id @default(autoincrement())
-  username       String    @unique
-  fullName       String
-  phone          String
-  email          String    @unique
-  passwordHash   String
-  bio            String?
-  avatarUrl      String?
-  isVerify       Boolean   @default(false)
-  isPrivate      Boolean   @default(false)
-  notify         Boolean   @default(true)
-  verifiedAt     DateTime?
-  createdAt      DateTime  @default(now())
+  id                   Int       @id @default(autoincrement())
+  username             String    @unique
+  fullName             String
+  phone                String
+  email                String    @unique
+  passwordHash         String
+  bio                  String?
+  avatarUrl            String?
+  isVerify             Boolean   @default(false)
+  isPrivate            Boolean   @default(false)
+  notificationsEnabled Boolean   @default(true)
+  verifiedAt           DateTime?
+  createdAt            DateTime  @default(now())
 
-  followersCount   Int     @default(0)
-  followingCount   Int     @default(0)
-  postCount        Int     @default(0)
+  followersCount Int @default(0)
+  followingCount Int @default(0)
+  postCount      Int @default(0)
 
-  blockedCount       Int   @default(0)
-  closeFriendsCount  Int   @default(0)
+  blockedCount      Int @default(0)
+  closeFriendsCount Int @default(0)
 
-  posts          Post[]
-  stories        Story[]
-  followers      Follower[] @relation("UserFollowers")
-  following      Follower[] @relation("UserFollowing")
-  likes          Like[]
-  comments       Comment[]
-  storyViews     StoryView[]
-  savedPosts     SavedPost[]
-  commentLikes   CommentLike[]
+  posts        Post[]
+  stories      Story[]
+  followers    Follower[]    @relation("UserFollowers")
+  following    Follower[]    @relation("UserFollowing")
+  likes        Like[]
+  comments     Comment[]
+  storyViews   StoryView[]
+  savedPosts   SavedPost[]
+  commentLikes CommentLike[]
 
   closeFriends     CloseFriend[] @relation("UserCloseFriendsOwner")
   inCloseFriendsOf CloseFriend[] @relation("UserCloseFriendsMember")
@@ -63,14 +63,14 @@ enum FollowRequestStatus {
 }
 
 model FollowRequest {
-  id          Int                  @id @default(autoincrement())
-  requester   User                 @relation("FollowRequestsOutgoing", fields: [requesterId], references: [id], onDelete: Cascade)
+  id          Int                 @id @default(autoincrement())
+  requester   User                @relation("FollowRequestsOutgoing", fields: [requesterId], references: [id], onDelete: Cascade)
   requesterId Int
-  target      User                 @relation("FollowRequestsIncoming", fields: [targetId], references: [id], onDelete: Cascade)
+  target      User                @relation("FollowRequestsIncoming", fields: [targetId], references: [id], onDelete: Cascade)
   targetId    Int
-  status      FollowRequestStatus  @default(PENDING)
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
+  status      FollowRequestStatus @default(PENDING)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
   @@unique([requesterId, targetId])
   @@index([targetId, createdAt])
@@ -91,12 +91,12 @@ model Follower {
 }
 
 model CloseFriend {
-  id         Int      @id @default(autoincrement())
-  owner      User     @relation("UserCloseFriendsOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  ownerId    Int
-  friend     User     @relation("UserCloseFriendsMember", fields: [friendId], references: [id], onDelete: Cascade)
-  friendId   Int
-  createdAt  DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  owner     User     @relation("UserCloseFriendsOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId   Int
+  friend    User     @relation("UserCloseFriendsMember", fields: [friendId], references: [id], onDelete: Cascade)
+  friendId  Int
+  createdAt DateTime @default(now())
 
   @@unique([ownerId, friendId])
   @@index([ownerId, createdAt])
@@ -104,12 +104,12 @@ model CloseFriend {
 }
 
 model Block {
-  id         Int      @id @default(autoincrement())
-  blocker    User     @relation("UserBlocksOwner",  fields: [blockerId], references: [id], onDelete: Cascade)
-  blockerId  Int
-  blocked    User     @relation("UserBlocksMember", fields: [blockedId], references: [id], onDelete: Cascade)
-  blockedId  Int
-  createdAt  DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  blocker   User     @relation("UserBlocksOwner", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockerId Int
+  blocked   User     @relation("UserBlocksMember", fields: [blockedId], references: [id], onDelete: Cascade)
+  blockedId Int
+  createdAt DateTime @default(now())
 
   @@unique([blockerId, blockedId])
   @@index([blockerId, createdAt])
@@ -117,26 +117,26 @@ model Block {
 }
 
 model Post {
-  id          Int         @id @default(autoincrement())
-  caption     String?
-  isReels     Boolean     @default(false)
-  videoUrl    String?
-  thumbnail   String?
-  createdAt   DateTime    @default(now())
+  id        Int      @id @default(autoincrement())
+  caption   String?
+  isReels   Boolean  @default(false)
+  videoUrl  String?
+  thumbnail String?
+  createdAt DateTime @default(now())
 
-  user        User        @relation(fields: [userId], references: [id])
-  userId      Int
+  user   User @relation(fields: [userId], references: [id])
+  userId Int
 
-  images      PostImage[]
-  likes       Like[]
-  comments    Comment[]
-  savedBy     SavedPost[]
+  images   PostImage[]
+  likes    Like[]
+  comments Comment[]
+  savedBy  SavedPost[]
 
-  shareCount     Int      @default(0)
-  likesCount     Int      @default(0)
-  commentsCount  Int      @default(0)
-  savedCount     Int      @default(0)
-  viewsCount     Int      @default(0)
+  shareCount    Int @default(0)
+  likesCount    Int @default(0)
+  commentsCount Int @default(0)
+  savedCount    Int @default(0)
+  viewsCount    Int @default(0)
 
   @@index([isReels, id])
   @@index([userId, createdAt])
@@ -148,8 +148,8 @@ model PostImage {
   position  Int      @default(0)
   createdAt DateTime @default(now())
 
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  postId    Int
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId Int
 
   @@unique([postId, position])
 }
@@ -158,7 +158,7 @@ model Like {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
 
-  user   User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId Int
 
   post   Post? @relation(fields: [postId], references: [id], onDelete: Cascade)
@@ -185,16 +185,16 @@ model SavedPost {
 }
 
 model Story {
-  id          Int       @id @default(autoincrement())
-  imageUrl    String?
-  videoUrl    String?
-  createdAt   DateTime  @default(now())
-  expiresAt   DateTime
+  id        Int      @id @default(autoincrement())
+  imageUrl  String?
+  videoUrl  String?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
 
-  user        User      @relation(fields: [userId], references: [id])
-  userId      Int
+  user   User @relation(fields: [userId], references: [id])
+  userId Int
 
-  views       StoryView[]
+  views StoryView[]
 
   @@index([userId, expiresAt])
   @@index([expiresAt])
@@ -202,34 +202,34 @@ model Story {
 }
 
 model StoryView {
-  id        Int      @id @default(autoincrement())
-  story     Story    @relation(fields: [storyId], references: [id])
-  storyId   Int
-  viewer    User     @relation(fields: [viewerId], references: [id])
-  viewerId  Int
-  viewedAt  DateTime @default(now())
+  id       Int      @id @default(autoincrement())
+  story    Story    @relation(fields: [storyId], references: [id])
+  storyId  Int
+  viewer   User     @relation(fields: [viewerId], references: [id])
+  viewerId Int
+  viewedAt DateTime @default(now())
 
   @@unique([storyId, viewerId])
 }
 
 model Comment {
-  id          Int      @id @default(autoincrement())
-  content     String
-  createdAt   DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  content   String
+  createdAt DateTime @default(now())
 
-  user        User     @relation(fields: [userId], references: [id])
-  userId      Int
+  user   User @relation(fields: [userId], references: [id])
+  userId Int
 
-  post        Post?    @relation(fields: [postId], references: [id])
-  postId      Int?
+  post   Post? @relation(fields: [postId], references: [id])
+  postId Int?
 
-  parentId    Int?
-  parent      Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
-  replies     Comment[] @relation("CommentReplies")
+  parentId Int?
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies  Comment[] @relation("CommentReplies")
 
-  likes       CommentLike[]
+  likes CommentLike[]
 
-  likesCount  Int      @default(0)
+  likesCount Int @default(0)
 
   @@index([postId, parentId, id])
   @@index([parentId, id])
@@ -240,10 +240,10 @@ model CommentLike {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int
 
-  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  comment   Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
   commentId Int
 
   @@unique([userId, commentId])

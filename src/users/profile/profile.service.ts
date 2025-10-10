@@ -22,7 +22,7 @@ export class ProfileService {
                 avatarUrl: true,
                 isVerify: true,
                 isPrivate: true,
-                notify: true,
+                notificationsEnabled: true,
                 createdAt: true,
             },
         });
