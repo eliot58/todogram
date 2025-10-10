@@ -91,14 +91,14 @@ export class ProfileService {
     async toggleNotify(userId: number) {
         const current = await this.prisma.user.findUnique({
             where: { id: userId },
-            select: { notify: true },
+            select: { notificationsEnabled: true },
         });
         if (!current) throw new NotFoundException('User not found');
 
         const updated = await this.prisma.user.update({
             where: { id: userId },
-            data: { notify: !current.notify },
-            select: { notify: true },
+            data: { notificationsEnabled: !current.notificationsEnabled },
+            select: { notificationsEnabled: true },
         });
 
         return updated;
