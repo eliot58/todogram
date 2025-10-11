@@ -104,27 +104,11 @@ export class ProfileService {
         return updated;
     }
 
-    async getUserPublications(
+    async getMyPosts(
         viewerId: number,
         targetId: number,
         { isReels, cursor, limit }: { isReels: boolean | undefined; cursor?: number; limit?: number }
     ) {
-        const exists = await this.prisma.user.findUnique({
-            where: { id: targetId },
-            select: { id: true, isPrivate: true },
-        });
-        if (!exists) throw new NotFoundException('User not found');
-
-        const blocked = await this.prisma.block.findFirst({
-            where: { blockerId: targetId, blockedId: viewerId },
-            select: { id: true },
-        });
-        if (blocked) {
-            return { items: [], nextCursor: null };
-        }
-
-        if (viewerId !== targetId && exists.isPrivate) throw new ForbiddenException('User isPrivate');
-
         const take = Math.min(Math.max(limit || 20, 1), 100);
 
         const posts = await this.prisma.post.findMany({

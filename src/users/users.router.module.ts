@@ -8,7 +8,6 @@ import { FollowRequestsModule } from './follow-requests/follow-requests.module';
 import { RelationsModule } from './relations/relations.module';
 import { CloseFriendsModule } from './close-friends/close-friends.module';
 import { BlockedModule } from './blocked/blocked.module';
-import { FeedModule } from './feed/feed.module';
 import { SearchModule } from './search/search.module';
 
 @Module({
@@ -20,7 +19,6 @@ import { SearchModule } from './search/search.module';
     RelationsModule,
     CloseFriendsModule,
     BlockedModule,
-    FeedModule,
     SearchModule,
     RouterModule.register([
       {
@@ -30,7 +28,6 @@ import { SearchModule } from './search/search.module';
           { path: 'follow-requests', module: FollowRequestsModule },
           { path: 'close-friends', module: CloseFriendsModule },
           { path: 'blocked', module: BlockedModule },
-          { path: 'feed', module: FeedModule },
           { path: 'search', module: SearchModule },
           { path: '', module: RelationsModule },
           { path: '', module: FollowModule },

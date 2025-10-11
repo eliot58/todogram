@@ -71,14 +71,14 @@ export class ProfileController {
   @ApiQuery({ name: 'cursor', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   getMyPosts(@Req() req: RequestWithAuth, @Query('cursor') cursor?: number, @Query('limit') limit = 20) {
-    return this.service.getUserPublications(req.userId, req.userId, { isReels: undefined, cursor, limit });
+    return this.service.getMyPosts(req.userId, req.userId, { isReels: undefined, cursor, limit });
   }
 
   @Get('reels')
   @ApiQuery({ name: 'cursor', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   getMyReels(@Req() req: RequestWithAuth, @Query('cursor') cursor?: number, @Query('limit') limit = 20) {
-    return this.service.getUserPublications(req.userId, req.userId, { isReels: true, cursor, limit });
+    return this.service.getMyPosts(req.userId, req.userId, { isReels: true, cursor, limit });
   }
 
   @Get('close-friends')
