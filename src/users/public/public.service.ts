@@ -50,7 +50,7 @@ export class PublicService {
             viewer: {
                 isFollowing: isFollowedByViewer,
                 isFollowedBy: isFollowingViewer,
-                followRequest: outgoingReq ? { id: outgoingReq.id, status: outgoingReq.status } : null,
+                followRequest: outgoingReq ? { id: outgoingReq.id, status: outgoingReq.status } : false,
             },
         };
     }
@@ -115,7 +115,7 @@ export class PublicService {
                 viewer: {
                     isFollowing,
                     isFollowedBy,
-                    followRequest: req ? { id: req.id, status: req.status } : null,
+                    followRequest: req ? { id: req.id, status: req.status } : false,
                 },
                 isMe: follower.id === viewerId,
             };
@@ -185,7 +185,7 @@ export class PublicService {
                 viewer: {
                     isFollowing,
                     isFollowedBy,
-                    followRequest: req ? { id: req.id, status: req.status } : null,
+                    followRequest: req ? { id: req.id, status: req.status } : false,
                 },
                 isMe: following.id === viewerId,
             };
@@ -282,7 +282,7 @@ export class PublicService {
                 liked: p.likes.length > 0,
                 saved: p.savedBy.length > 0,
                 followsAuthor: p.user.followers.length > 0,
-                followRequest: followReq ? { id: followReq.id, status: followReq.status } : null,
+                followRequest: followReq ? { id: followReq.id, status: followReq.status } : false,
             };
         });
 
