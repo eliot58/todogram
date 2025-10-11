@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
-import { ConfigModule, ConfigService, ConfigType } from '@nestjs/config';
+import { ConfigModule, ConfigType } from '@nestjs/config';
 import { SentryModule } from '@sentry/nestjs/setup';
 import { APP_FILTER } from '@nestjs/core';
 import { SentryGlobalFilter } from '@sentry/nestjs/setup';
@@ -42,7 +42,7 @@ import appConfig from './config/app.config';
     UsersRouterModule,
     PostsModule,
     StoriesModule,
-    ChatModule,
+    ChatModule
   ],
   controllers: [AppController],
   providers: [

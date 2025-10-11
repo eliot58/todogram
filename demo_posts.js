@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 const IMAGES_BASE = 'https://s3.twcstorage.ru/db1450dc-47945e70-1d58-4112-84d9-6c2f05b41ca2/demo/images';
 const VIDEOS_BASE = 'https://s3.twcstorage.ru/db1450dc-47945e70-1d58-4112-84d9-6c2f05b41ca2/demo/videos';
 const MAX_INDEX = 19;          // картинки/видео: 1..19
-const POSTS_PER_KIND = 5;      // 5 обычных + 5 рилсов
+const POSTS_PER_KIND = 10;      // 5 обычных + 5 рилсов
 
 // --- Короткие/длинные подписи ---
 const SHORT_CAPTIONS = [
